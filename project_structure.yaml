@@ -1,13 +1,13 @@
 paths:
-  - xrpl-grouppay-demo/requirements.txt
-  - xrpl-grouppay-demo/README.md
-  - xrpl-grouppay-demo/app/__init__.py
-  - xrpl-grouppay-demo/app/main.py
-  - xrpl-grouppay-demo/app/config.py
-  - xrpl-grouppay-demo/app/models.py
-  - xrpl-grouppay-demo/app/state.py
-  - xrpl-grouppay-demo/app/xrpl_service.py
-  - xrpl-grouppay-demo/app/did_registry.py
-  - xrpl-grouppay-demo/app/group_pay.py
-  - xrpl-grouppay-demo/static/marketplace.html
-  - xrpl-grouppay-demo/static/wallet.html
+  - requirements.txt
+  - README.md
+  - app/__init__.py
+  - app/main.py
+  - app/config.py
+  - app/models.py
+  - app/state.py
+  - app/xrpl_service.py
+  - app/did_registry.py
+  - app/group_pay.py
+  - static/marketplace.html
+  - static/wallet.html

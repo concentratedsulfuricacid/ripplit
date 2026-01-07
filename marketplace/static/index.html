@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Marketplace</title>
+  <style>
+    :root{
+      --bg:#0b1020;
+      --panel:#111a33;
+      --text:#eef2ff;
+      --muted:#a9b2d9;
+      --accent:#7c5cff;
+      --border:rgba(255,255,255,.10);
+      --shadow: 0 12px 30px rgba(0,0,0,.35);
+      --r:16px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background: radial-gradient(900px 500px at 20% 0%, rgba(124,92,255,.25), transparent 60%),
+                  radial-gradient(900px 500px at 80% 10%, rgba(47,228,171,.18), transparent 55%),
+                  var(--bg);
+      color: var(--text);
+    }
+    .wrap{max-width:1100px; margin:0 auto; padding:22px 16px 60px}
+    header{
+      display:flex; justify-content:space-between; align-items:center; gap:14px;
+      padding:14px 16px;
+      border:1px solid var(--border);
+      border-radius: var(--r);
+      background: rgba(255,255,255,.04);
+      box-shadow: var(--shadow);
+    }
+    .brand{display:flex; align-items:center; gap:12px}
+    .logo{width:38px; height:38px; border-radius:14px;
+      background: linear-gradient(135deg, rgba(124,92,255,.95), rgba(47,228,171,.85));}
+    h1{font-size:18px; margin:0}
+    .tabs{display:flex; gap:8px}
+    .tab{
+      padding:10px 12px;
+      border-radius: 999px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      color: var(--muted);
+      font-weight:700;
+      cursor:pointer;
+      user-select:none;
+    }
+    .tab.active{
+      background: rgba(124,92,255,.18);
+      color: var(--text);
+      border-color: rgba(124,92,255,.35);
+    }
+
+    .grid{
+      margin-top:14px;
+      display:grid;
+      grid-template-columns: 1.35fr .65fr;
+      gap:14px;
+    }
+    @media (max-width: 900px){
+      .grid{grid-template-columns: 1fr;}
+    }
+
+    .card{
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .cardHeader{
+      padding:14px 16px;
+      border-bottom:1px solid var(--border);
+      display:flex; justify-content:space-between; align-items:center;
+    }
+    .cardBody{padding:16px}
+
+    .products{
+      display:grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap:12px;
+    }
+    @media (max-width: 900px){
+      .products{grid-template-columns: 1fr;}
+    }
+    .p{
+      border:1px solid var(--border);
+      border-radius: var(--r);
+      padding:12px;
+      background: rgba(0,0,0,.20);
+      display:flex; flex-direction:column; gap:10px;
+      min-height: 165px;
+    }
+    .pName{margin:0; font-size:15px; font-weight:800}
+    .pSku{font-size:12px; color: var(--muted)}
+    .pPrice{font-size:16px; font-weight:900; margin-top:auto}
+    .btnRow{display:flex; gap:8px; margin-top:6px}
+    button{
+      border:0; cursor:pointer; border-radius: 12px; padding:10px 12px;
+      font-weight:800;
+      transition: transform .04s ease, opacity .15s ease;
+    }
+    button:active{transform: translateY(1px)}
+    .btn{background: rgba(255,255,255,.06); border:1px solid var(--border); color: var(--text);}
+    .btnPrimary{
+      background: linear-gradient(135deg, rgba(124,92,255,.95), rgba(124,92,255,.65));
+      color:white;
+    }
+    .btnGhost{background: transparent; border:1px solid var(--border); color: var(--muted);}
+    .btnDanger{background: rgba(255,77,109,.14); border:1px solid rgba(255,77,109,.35); color:#ffd5dd;}
+
+    .cartLine{
+      display:flex; justify-content:space-between; align-items:center; gap:10px;
+      padding:10px 0;
+      border-bottom:1px solid rgba(255,255,255,.08);
+    }
+    .cartLine:last-child{border-bottom:0}
+    .cartName{font-weight:900}
+    .cartMeta{color:var(--muted); font-size:12px; margin-top:2px}
+    .qty{display:flex; align-items:center; gap:8px}
+    .qtyBtn{
+      width:34px; height:34px; border-radius:12px;
+      background: rgba(255,255,255,.06);
+      border:1px solid var(--border);
+      color: var(--text);
+      display:flex; align-items:center; justify-content:center;
+      font-weight:900;
+    }
+    .totals{
+      margin-top:12px;
+      padding-top:12px;
+      border-top:1px solid rgba(255,255,255,.10);
+      display:flex; flex-direction:column; gap:8px;
+    }
+    .row2{display:flex; justify-content:space-between; color:var(--muted); font-size:13px}
+    .row2 strong{color:var(--text); font-size:14px}
+    .stack{display:flex; flex-direction:column; gap:10px; margin-top:12px}
+
+    .badge{
+      font-size:12px;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      color: var(--muted);
+      white-space:nowrap;
+      display:inline-block;
+    }
+    .paid{border-color: rgba(47,228,171,.35); background: rgba(47,228,171,.12); color:#c8fff0}
+    .pending{border-color: rgba(124,92,255,.35); background: rgba(124,92,255,.12); color:#e6ddff}
+    .failed{border-color: rgba(255,77,109,.35); background: rgba(255,77,109,.12); color:#ffd5dd}
+
+    .ordersList{display:flex; flex-direction:column; gap:10px}
+    .orderItem{
+      border:1px solid var(--border);
+      background: rgba(0,0,0,.18);
+      border-radius: var(--r);
+      padding:12px;
+      display:flex; justify-content:space-between; align-items:flex-start; gap:12px;
+    }
+    .orderId{font-weight:950}
+    .orderSmall{font-size:12px; color: var(--muted); margin-top:3px}
+    .orderRight{display:flex; flex-direction:column; align-items:flex-end; gap:8px}
+    .orderActions{display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end}
+    .hidden{display:none}
+    .hint{color:var(--muted); font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <h1>Marketplace</h1>
+          <div class="hint">Checkout → choose payment</div>
+        </div>
+      </div>
+      <div class="tabs">
+        <div class="tab active" id="tabShop" onclick="setTab('shop')">Shop</div>
+        <div class="tab" id="tabOrders" onclick="setTab('orders')">Orders</div>
+      </div>
+    </header>
+
+    <!-- SHOP TAB -->
+    <div id="shopView">
+      <div class="grid">
+        <div class="card">
+          <div class="cardHeader">
+            <div style="font-weight:950">Products</div>
+            <div class="badge" id="cartCount">Cart: 0</div>
+          </div>
+          <div class="cardBody">
+            <div class="products" id="products"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="cardHeader">
+            <div style="font-weight:950">Cart</div>
+            <button class="btnGhost" onclick="clearCart()">Clear</button>
+          </div>
+          <div class="cardBody">
+            <div id="cart"></div>
+
+            <div class="totals">
+              <div class="row2"><span>Total</span><strong id="total">0.00 XRP</strong></div>
+            </div>
+
+            <div class="stack">
+              <button class="btnPrimary" onclick="checkout()" id="checkoutBtn" disabled>Checkout</button>
+              <div class="hint" id="checkoutHint">Add an item to enable checkout.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <div class="cardHeader">
+          <div style="font-weight:950">Payment</div>
+          <div class="badge" id="payState">No order</div>
+        </div>
+        <div class="cardBody">
+          <div class="orderActions">
+            <button class="btnPrimary" onclick="payRipplit()" id="payRipplitBtn" disabled>Pay via Ripplit</button>
+            <button class="btn" onclick="otherPayment()" id="payOtherBtn" disabled>Other Payment Methods</button>
+          </div>
+          <div class="hint" id="payHint" style="margin-top:10px">Checkout to create an order.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ORDERS TAB -->
+    <div id="ordersView" class="hidden" style="margin-top:14px">
+      <div class="card">
+        <div class="cardHeader">
+          <div style="font-weight:950">Orders</div>
+          <button class="btnGhost" onclick="loadOrders()">Refresh</button>
+        </div>
+        <div class="cardBody">
+          <div class="ordersList" id="ordersList"></div>
+          <div class="hint" id="ordersEmpty" style="margin-top:8px">No orders yet.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const PRODUCTS = [
+  { sku:"RM-HEAD-01", name:"Demo Headphones", price:3.00 },
+  { sku:"RM-KB-02",   name:"Mechanical Keyboard (Mini)", price:4.50 },
+  { sku:"RM-MUG-03",  name:"Developer Mug", price:1.80 }
+];
+
+const cart = new Map(); // sku -> qty
+let currentOrder = null; // {order, redirect_url}
+
+function money(x){ return `${x.toFixed(2)} XRP`; }
+
+function badgeFor(status){
+  const cls = status === "PAID" ? "paid" : status === "FAILED" ? "failed" : "pending";
+  return `<span class="badge ${cls}">${status}</span>`;
+}
+
+function renderProducts(){
+  const el = document.getElementById("products");
+  el.innerHTML = PRODUCTS.map(p => `
+    <div class="p">
+      <div class="pSku">${p.sku}</div>
+      <div class="pName">${p.name}</div>
+      <div class="pPrice">${money(p.price)}</div>
+      <div class="btnRow">
+        <button class="btn" onclick="addToCart('${p.sku}')">Add</button>
+        <button class="btnGhost" onclick="removeFromCart('${p.sku}')">Remove</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function cartItems(){
+  return [...cart.entries()].map(([sku, qty]) => {
+    const p = PRODUCTS.find(x => x.sku === sku);
+    return { sku, name: p.name, unit_price_xrp: p.price, qty };
+  });
+}
+
+function renderCart(){
+  const el = document.getElementById("cart");
+  const items = cartItems();
+  const count = items.reduce((s,i)=>s+i.qty,0);
+  document.getElementById("cartCount").textContent = `Cart: ${count}`;
+
+  if(items.length === 0){
+    el.innerHTML = `<div class="hint">Cart is empty.</div>`;
+  } else {
+    el.innerHTML = items.map(i => `
+      <div class="cartLine">
+        <div>
+          <div class="cartName">${i.name}</div>
+          <div class="cartMeta">${i.sku} • ${money(i.unit_price_xrp)}</div>
+        </div>
+        <div class="qty">
+          <button class="qtyBtn" onclick="decQty('${i.sku}')">−</button>
+          <div style="min-width:22px; text-align:center; font-weight:900;">${i.qty}</div>
+          <button class="qtyBtn" onclick="incQty('${i.sku}')">+</button>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  const total = items.reduce((s,i)=>s + i.unit_price_xrp*i.qty,0);
+  document.getElementById("total").textContent = money(total);
+
+  const canCheckout = total > 0;
+  document.getElementById("checkoutBtn").disabled = !canCheckout;
+  document.getElementById("checkoutHint").textContent = canCheckout
+    ? "Checkout to create an order."
+    : "Add an item to enable checkout.";
+}
+
+function addToCart(sku){ cart.set(sku,(cart.get(sku)||0)+1); renderCart(); }
+function removeFromCart(sku){ cart.delete(sku); renderCart(); }
+function incQty(sku){ cart.set(sku,(cart.get(sku)||0)+1); renderCart(); }
+function decQty(sku){
+  const q=(cart.get(sku)||0)-1;
+  if(q<=0) cart.delete(sku); else cart.set(sku,q);
+  renderCart();
+}
+function clearCart(){ cart.clear(); renderCart(); }
+
+function setPayState(text, status){
+  const el = document.getElementById("payState");
+  el.classList.remove("paid","pending","failed");
+  el.classList.add("badge");
+  if(status === "PAID") el.classList.add("paid");
+  else if(status === "FAILED") el.classList.add("failed");
+  else if(status) el.classList.add("pending");
+  el.textContent = text;
+}
+
+async function checkout(){
+  const items = cartItems();
+  if(!items.length) return;
+
+  const r = await fetch("/api/order/create", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ items })
+  });
+  const j = await r.json();
+  currentOrder = j;
+
+  document.getElementById("payRipplitBtn").disabled = false;
+  document.getElementById("payOtherBtn").disabled = false;
+
+  setPayState(`Order ${j.order.order_id}`, "PENDING");
+  document.getElementById("payHint").textContent = `Total: ${money(j.order.total_xrp)}`;
+
+  // Keep cart for now (you can clear if you prefer)
+  await loadOrders();
+}
+
+function payRipplit(){
+  if(!currentOrder) return;
+  // Opens Ripplit in a NEW TAB (external app)
+  window.open(currentOrder.redirect_url, "_blank");
+  document.getElementById("payHint").textContent = "Ripplit opened in a new tab.";
+}
+
+function otherPayment(){
+  document.getElementById("payHint").textContent = "Other Payment Methods (coming soon).";
+}
+
+async function loadOrders(){
+  const r = await fetch("/api/orders");
+  const j = await r.json();
+  const orders = j.orders || [];
+  const list = document.getElementById("ordersList");
+  const empty = document.getElementById("ordersEmpty");
+
+  if(!orders.length){
+    list.innerHTML = "";
+    empty.style.display = "block";
+    return;
+  }
+  empty.style.display = "none";
+  list.innerHTML = orders.map(o => `
+    <div class="orderItem">
+      <div>
+        <div class="orderId">${o.order_id} ${badgeFor(o.status)}</div>
+        <div class="orderSmall">${o.items.length} item(s) • Total ${money(o.total_xrp)}</div>
+      </div>
+      <div class="orderRight">
+        <div class="orderActions">
+          <button class="btnPrimary" onclick="openRipplitFor('${o.order_id}', ${o.total_xrp})">Pay via Ripplit</button>
+          <button class="btn" onclick="noop()">Other Payment Methods</button>
+        </div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function openRipplitFor(orderId, totalXrp){
+  // Rebuild redirect URL for an existing order:
+  const returnUrl = encodeURIComponent("http://127.0.0.1:8010/api/order/ripplit_callback");
+  const redirect = `http://127.0.0.1:8020/static/pay.html?order_id=${orderId}&total_xrp=${totalXrp}&return_url=${returnUrl}`;
+  window.open(redirect, "_blank");
+}
+
+function noop(){}
+
+function setTab(which){
+  const shop = document.getElementById("shopView");
+  const orders = document.getElementById("ordersView");
+  const t1 = document.getElementById("tabShop");
+  const t2 = document.getElementById("tabOrders");
+
+  if(which === "orders"){
+    shop.classList.add("hidden");
+    orders.classList.remove("hidden");
+    t1.classList.remove("active");
+    t2.classList.add("active");
+    loadOrders();
+  } else {
+    orders.classList.add("hidden");
+    shop.classList.remove("hidden");
+    t2.classList.remove("active");
+    t1.classList.add("active");
+  }
+}
+
+renderProducts();
+renderCart();
+setPayState("No order", null);
+loadOrders();
+</script>
+</body>
+</html>

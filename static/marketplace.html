@@ -1,0 +1,674 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GroupPay Checkout</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Space+Grotesk:wght@400;500;600;700&display=swap");
+
+    :root {
+      --bg: #f3f0ea;
+      --ink: #1a1a1a;
+      --accent: #1f6f65;
+      --accent-dark: #165148;
+      --gold: #f1c66d;
+      --rose: #f7b6b0;
+      --card: #ffffff;
+      --shadow: 0 24px 45px rgba(19, 19, 19, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", sans-serif;
+      color: var(--ink);
+      background: radial-gradient(circle at 15% 0%, #fff7e5 0%, var(--bg) 45%, #efe5d8 100%);
+      min-height: 100vh;
+    }
+
+    .glow {
+      position: fixed;
+      inset: -20% 60% auto auto;
+      width: 340px;
+      height: 340px;
+      background: radial-gradient(circle, rgba(31, 111, 101, 0.2), transparent 70%);
+      filter: blur(4px);
+      z-index: -1;
+    }
+
+    header {
+      padding: 28px 8vw 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-mark {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--accent), #2e8a7b);
+      box-shadow: 0 12px 25px rgba(31, 111, 101, 0.35);
+    }
+
+    header h1 {
+      margin: 0;
+      font-family: "Fraunces", serif;
+      font-size: 30px;
+    }
+
+    .mode {
+      font-size: 13px;
+      background: #fff1d8;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid #f0d2a3;
+    }
+
+    main {
+      padding: 0 8vw 60px;
+      display: grid;
+      gap: 24px;
+    }
+
+    .banner {
+      display: grid;
+      gap: 18px;
+      background: var(--card);
+      border-radius: 24px;
+      padding: 26px;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    .tag {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      color: #6c5742;
+      background: #fff3df;
+      padding: 6px 12px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      width: fit-content;
+    }
+
+    .banner h2 {
+      margin: 0;
+      font-size: 26px;
+      font-family: "Fraunces", serif;
+    }
+
+    .banner p {
+      margin: 0;
+      color: #4a4a4a;
+      max-width: 560px;
+    }
+
+    .banner-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+
+    .meta-card {
+      background: #f7f3ec;
+      border-radius: 16px;
+      padding: 12px 14px;
+      border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .meta-card span {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #6d5b4b;
+    }
+
+    .meta-card strong {
+      display: block;
+      margin-top: 6px;
+      font-size: 16px;
+    }
+
+    .return-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--rose);
+      color: #1b1b1b;
+      padding: 10px 16px;
+      border-radius: 999px;
+      text-decoration: none;
+      font-weight: 600;
+      width: fit-content;
+    }
+
+    .grid {
+      display: grid;
+      gap: 24px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+
+    .panel {
+      background: var(--card);
+      border-radius: 22px;
+      padding: 22px;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .panel h3 {
+      margin: 0 0 16px;
+      font-size: 18px;
+    }
+
+    .product-card {
+      border-radius: 16px;
+      padding: 14px;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      margin-bottom: 12px;
+      display: grid;
+      gap: 10px;
+      background: #faf7f2;
+    }
+
+    .product-card button {
+      justify-self: start;
+    }
+
+    .product-card.locked button {
+      background: #d7d2c8;
+      cursor: not-allowed;
+    }
+
+    .contact-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .contact-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: #f6f8f7;
+      border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    button {
+      border: none;
+      background: var(--accent);
+      color: white;
+      padding: 10px 18px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+
+    button:hover {
+      background: var(--accent-dark);
+      transform: translateY(-1px);
+    }
+
+    button.secondary {
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #f6f6f6;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .status.paid {
+      background: #e6f5ec;
+      border-color: #b8e2c6;
+      color: #1b6b3a;
+    }
+
+    .status.funding {
+      background: #fff0d6;
+      border-color: #f3d7a7;
+      color: #915d18;
+    }
+
+    .status.expired {
+      background: #fde3e0;
+      border-color: #f4b9b1;
+      color: #9a2d2d;
+    }
+
+    .order-details {
+      display: grid;
+      gap: 12px;
+      font-size: 14px;
+    }
+
+    .pill {
+      background: #f3ede7;
+      padding: 6px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+    }
+
+    .links {
+      display: grid;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .links a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .links a:hover {
+      text-decoration: underline;
+    }
+
+    .error {
+      color: #9a2d2d;
+      font-size: 13px;
+      min-height: 18px;
+    }
+
+    .quantity {
+      display: grid;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .quantity input {
+      width: 120px;
+      padding: 6px 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      font-family: inherit;
+    }
+
+    @media (max-width: 720px) {
+      header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="glow"></div>
+  <header>
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <div>
+        <h1>GroupPay Checkout</h1>
+        <div class="pill">Split payments settle on XRPL Testnet</div>
+      </div>
+    </div>
+    <div class="mode" id="mode-pill">XRPL mode: ...</div>
+  </header>
+
+  <main>
+    <section class="banner">
+      <span class="tag">Redirected checkout</span>
+      <h2>You are paying <span id="merchant-name">Demo Merchant</span></h2>
+      <p id="merchant-message">Your payment is hosted by GroupPay. We will route funds to the merchant once everyone locks their share.</p>
+      <a id="return-link" class="return-link" href="#" style="display: none;">Return to merchant</a>
+      <div class="banner-meta">
+        <div class="meta-card">
+          <span>Order reference</span>
+          <strong id="merchant-order-id">Not provided</strong>
+        </div>
+        <div class="meta-card">
+          <span>Checkout total</span>
+          <strong id="merchant-total">Select an item</strong>
+        </div>
+        <div class="meta-card">
+          <span>Settlement method</span>
+          <strong>XRPL Escrow + GroupPay</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="panel" id="order-panel">
+        <h3 id="catalog-title">Order summary (demo catalog)</h3>
+        <div id="product-list"></div>
+        <div class="quantity">
+          <label for="quantity">Quantity</label>
+          <input id="quantity" type="number" min="1" value="1" />
+        </div>
+      </div>
+      <div class="panel" id="checkout-panel">
+        <h3>Split your payment</h3>
+        <div class="order-details" id="cart-details">
+          <div>Select an item to start.</div>
+        </div>
+        <h4>Invite payers</h4>
+        <div class="contact-list" id="contact-list"></div>
+        <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
+          <button id="create-order">Create GroupPay Order</button>
+          <button class="secondary" id="clear-order">Reset</button>
+        </div>
+        <div class="error" id="error"></div>
+      </div>
+    </section>
+
+    <section class="panel" id="status-panel">
+      <h3>Live order status</h3>
+      <div class="order-details" id="order-details">
+        <div class="pill">No active order yet.</div>
+      </div>
+      <div class="links" id="payer-links"></div>
+    </section>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const apiKey = params.get("api_key") || localStorage.getItem("apiKey") || "";
+    if (apiKey) {
+      localStorage.setItem("apiKey", apiKey);
+    }
+
+    function buildHeaders() {
+      const headers = { "Content-Type": "application/json" };
+      if (apiKey) {
+        headers["X-API-Key"] = apiKey;
+      }
+      return headers;
+    }
+
+    const state = {
+      products: [],
+      contacts: [],
+      selectedProduct: null,
+      participants: new Set(),
+      order: null,
+      request: null,
+      checkoutUrls: {},
+      poller: null,
+      quantity: 1,
+      merchantName: params.get("merchant") || "Demo Merchant",
+      merchantOrderId: params.get("order_id") || "Not provided",
+      returnUrl: params.get("return_url") || "",
+      lockedProductId: params.get("product_id"),
+      lockedQuantity: parseInt(params.get("quantity") || "1", 10),
+    };
+
+    const productList = document.getElementById("product-list");
+    const contactList = document.getElementById("contact-list");
+    const cartDetails = document.getElementById("cart-details");
+    const orderDetails = document.getElementById("order-details");
+    const payerLinks = document.getElementById("payer-links");
+    const errorEl = document.getElementById("error");
+    const modePill = document.getElementById("mode-pill");
+    const merchantNameEl = document.getElementById("merchant-name");
+    const merchantOrderIdEl = document.getElementById("merchant-order-id");
+    const merchantTotalEl = document.getElementById("merchant-total");
+    const returnLinkEl = document.getElementById("return-link");
+    const catalogTitleEl = document.getElementById("catalog-title");
+    const quantityInput = document.getElementById("quantity");
+
+    document.getElementById("create-order").addEventListener("click", createOrder);
+    document.getElementById("clear-order").addEventListener("click", resetState);
+    quantityInput.addEventListener("input", () => {
+      const value = parseInt(quantityInput.value || "1", 10);
+      state.quantity = Math.max(1, value || 1);
+      updateCart();
+    });
+
+    async function boot() {
+      merchantNameEl.textContent = state.merchantName;
+      merchantOrderIdEl.textContent = state.merchantOrderId;
+      if (state.returnUrl) {
+        returnLinkEl.href = state.returnUrl;
+        returnLinkEl.style.display = "inline-flex";
+      }
+      if (state.lockedProductId) {
+        catalogTitleEl.textContent = "Order summary";
+        state.quantity = state.lockedQuantity || 1;
+        quantityInput.value = state.quantity;
+        quantityInput.disabled = true;
+      }
+      await Promise.all([loadProducts(), loadContacts(), loadInfo()]);
+      if (state.lockedProductId) {
+        state.selectedProduct = state.products.find(
+          (product) => product.id === state.lockedProductId
+        );
+      }
+      renderProducts();
+      renderContacts();
+      updateCart();
+    }
+
+    async function loadInfo() {
+      const res = await fetch("/api/info");
+      const info = await res.json();
+      modePill.textContent = `XRPL mode: ${info.xrpl_mode}`;
+    }
+
+    async function loadProducts() {
+      const res = await fetch("/api/products");
+      state.products = await res.json();
+    }
+
+    async function loadContacts() {
+      const res = await fetch("/api/contacts");
+      state.contacts = await res.json();
+    }
+
+    function renderProducts() {
+      productList.innerHTML = "";
+      const products = state.lockedProductId
+        ? state.products.filter((product) => product.id === state.lockedProductId)
+        : state.products;
+
+      products.forEach((product) => {
+        const card = document.createElement("div");
+        const isLocked = !!state.lockedProductId;
+        card.className = `product-card${isLocked ? " locked" : ""}`;
+        card.innerHTML = `
+          <div>
+            <strong>${product.name}</strong>
+            <div>${product.description}</div>
+          </div>
+          <div><strong>${product.price_xrp.toFixed(2)} XRP</strong></div>
+          <button ${isLocked ? "disabled" : ""} data-id="${product.id}">
+            ${state.selectedProduct?.id === product.id ? "Selected" : "Choose item"}
+          </button>
+        `;
+        card.querySelector("button").addEventListener("click", () => {
+          if (isLocked) return;
+          state.selectedProduct = product;
+          updateCart();
+          renderProducts();
+        });
+        productList.appendChild(card);
+      });
+    }
+
+    function renderContacts() {
+      contactList.innerHTML = "";
+      state.contacts.forEach((contact) => {
+        const row = document.createElement("label");
+        row.className = "contact-card";
+        row.innerHTML = `
+          <span>@${contact.handle}</span>
+          <input type="checkbox" />
+        `;
+        const checkbox = row.querySelector("input");
+        checkbox.addEventListener("change", () => {
+          if (checkbox.checked) {
+            state.participants.add(contact.handle);
+          } else {
+            state.participants.delete(contact.handle);
+          }
+          updateCart();
+        });
+        contactList.appendChild(row);
+      });
+    }
+
+    function updateCart() {
+      if (!state.selectedProduct) {
+        cartDetails.innerHTML = "<div>Select an item to start.</div>";
+        merchantTotalEl.textContent = "Select an item";
+        return;
+      }
+      const selected = Array.from(state.participants);
+      const total = state.selectedProduct.price_xrp * state.quantity;
+      const share = selected.length ? total / selected.length : 0;
+      merchantTotalEl.textContent = `${total.toFixed(2)} XRP`;
+      cartDetails.innerHTML = `
+        <div><strong>Item</strong>: ${state.selectedProduct.name}</div>
+        <div><strong>Quantity</strong>: ${state.quantity}</div>
+        <div><strong>Total</strong>: ${total.toFixed(2)} XRP</div>
+        <div><strong>Payers</strong>: ${selected.length ? selected.join(", ") : "None"}</div>
+        <div><strong>Share</strong>: ${selected.length ? share.toFixed(2) + " XRP each" : "-"}</div>
+      `;
+    }
+
+    async function createOrder() {
+      errorEl.textContent = "";
+      if (!state.selectedProduct) {
+        errorEl.textContent = "Select an item first.";
+        return;
+      }
+      const participants = Array.from(state.participants);
+      if (!participants.length) {
+        errorEl.textContent = "Select at least one payer.";
+        return;
+      }
+      const payload = {
+        product_id: state.selectedProduct.id,
+        quantity: state.quantity,
+        payment_method: "group_pay",
+        participants,
+        split: "equal",
+        deadline_minutes: 15,
+        return_url: state.returnUrl || window.location.href,
+      };
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: buildHeaders(),
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        errorEl.textContent = err.detail || "Failed to create order.";
+        return;
+      }
+      const data = await res.json();
+      state.order = data.order;
+      state.request = data.group_request;
+      state.checkoutUrls = data.checkout_urls || {};
+      renderOrder();
+      startPolling();
+    }
+
+    function renderOrder() {
+      if (!state.order || !state.request) {
+        orderDetails.innerHTML = "<div class=\"pill\">No active order yet.</div>";
+        payerLinks.innerHTML = "";
+        return;
+      }
+      const statusClass = statusClassName(state.request.status);
+      orderDetails.innerHTML = `
+        <div><span class="status ${statusClass}">${state.request.status}</span></div>
+        <div><strong>Order ID</strong>: ${state.order.id}</div>
+        <div><strong>Group Request</strong>: ${state.request.id}</div>
+        <div><strong>Deadline</strong>: ${new Date(state.request.deadline).toLocaleString()}</div>
+        <div><strong>Terms Hash</strong>: ${state.request.terms_hash.slice(0, 10)}...</div>
+      `;
+      payerLinks.innerHTML = "<strong>Payer links</strong>";
+      const checkoutHeader = document.createElement("div");
+      checkoutHeader.style.marginTop = "8px";
+      checkoutHeader.innerHTML = "<strong>Shareable checkout links</strong>";
+      payerLinks.appendChild(checkoutHeader);
+      state.request.participants.forEach((participant) => {
+        const link = document.createElement("a");
+        const url = new URL("/static/wallet.html", window.location.origin);
+        url.searchParams.set("handle", participant.handle);
+        url.searchParams.set("request_id", state.request.id);
+        if (state.returnUrl) {
+          url.searchParams.set("return_url", state.returnUrl);
+        }
+        link.href = url.toString();
+        link.textContent = `@${participant.handle} wallet`;
+        link.target = "_blank";
+        payerLinks.appendChild(link);
+
+        const checkoutLink = document.createElement("a");
+        const checkoutUrl = state.checkoutUrls[participant.handle] || link.href;
+        checkoutLink.href = checkoutUrl;
+        checkoutLink.textContent = `Pay as @${participant.handle} (redirect)`;
+        checkoutLink.target = "_blank";
+        payerLinks.appendChild(checkoutLink);
+      });
+    }
+
+    function statusClassName(status) {
+      if (status === "PAID") return "paid";
+      if (status === "EXPIRED") return "expired";
+      return "funding";
+    }
+
+    function startPolling() {
+      if (state.poller) {
+        clearInterval(state.poller);
+      }
+      state.poller = setInterval(async () => {
+        if (!state.request) return;
+        const res = await fetch(`/api/requests/${state.request.id}`);
+        if (res.ok) {
+          state.request = await res.json();
+          renderOrder();
+        }
+      }, 4000);
+    }
+
+    function resetState() {
+      state.selectedProduct = null;
+      state.participants.clear();
+      state.order = null;
+      state.request = null;
+      state.checkoutUrls = {};
+      errorEl.textContent = "";
+      if (state.poller) {
+        clearInterval(state.poller);
+        state.poller = null;
+      }
+      renderProducts();
+      renderContacts();
+      updateCart();
+      renderOrder();
+    }
+
+    boot();
+  </script>
+</body>
+</html>

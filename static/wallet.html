@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GroupPay Wallet</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600&display=swap");
+
+    :root {
+      --bg: #f4f7fb;
+      --ink: #1c1c1c;
+      --accent: #4a7c6f;
+      --accent-dark: #2d5b52;
+      --rose: #f1b4b8;
+      --card: #ffffff;
+      --shadow: 0 20px 40px rgba(20, 20, 20, 0.1);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", sans-serif;
+      color: var(--ink);
+      background: linear-gradient(130deg, #f8f2ec 0%, #f4f7fb 55%, #e9f0f7 100%);
+      min-height: 100vh;
+    }
+
+    .stripe {
+      position: fixed;
+      inset: auto auto -120px -60px;
+      width: 420px;
+      height: 420px;
+      background: radial-gradient(circle, rgba(74, 124, 111, 0.25), transparent 70%);
+      z-index: -1;
+      filter: blur(8px);
+    }
+
+    header {
+      padding: 32px 8vw 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    header h1 {
+      font-family: "Fraunces", serif;
+      font-size: 30px;
+      margin: 0;
+    }
+
+    main {
+      padding: 0 8vw 60px;
+      display: grid;
+      gap: 24px;
+    }
+
+    .panel {
+      background: var(--card);
+      border-radius: 22px;
+      padding: 22px;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(0, 0, 0, 0.12);
+      margin-top: 6px;
+      font-family: inherit;
+    }
+
+    button {
+      border: none;
+      background: var(--accent);
+      color: white;
+      padding: 10px 18px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+
+    button:hover {
+      background: var(--accent-dark);
+      transform: translateY(-1px);
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #f6f6f6;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .status.escrowed {
+      background: #fff2db;
+      border-color: #f3d7a7;
+      color: #915d18;
+    }
+
+    .status.finished {
+      background: #e6f5ec;
+      border-color: #b8e2c6;
+      color: #1b6b3a;
+    }
+
+    .status.refunded {
+      background: #fde3e0;
+      border-color: #f4b9b1;
+      color: #9a2d2d;
+    }
+
+    .merchant-pill {
+      font-size: 12px;
+      background: #fff1d8;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid #f0d2a3;
+    }
+
+    .summary {
+      display: grid;
+      gap: 12px;
+      font-size: 14px;
+    }
+
+    .participants {
+      display: grid;
+      gap: 8px;
+    }
+
+    .participant {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: #f6f8f7;
+      border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .error {
+      color: #9a2d2d;
+      font-size: 13px;
+      min-height: 18px;
+    }
+  </style>
+</head>
+<body>
+  <div class="stripe"></div>
+  <header>
+    <div>
+      <h1>GroupPay Wallet</h1>
+      <div class="merchant-pill" id="merchant-pill" style="display: none;"></div>
+    </div>
+    <div id="mode"></div>
+  </header>
+  <main>
+    <section class="panel">
+      <div class="summary">
+        <div>
+          <label for="handle">Handle</label>
+          <select id="handle"></select>
+        </div>
+        <div>
+          <label for="request">Request ID</label>
+          <input id="request" placeholder="Paste group request ID" />
+        </div>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+          <button id="load">Load Request</button>
+          <button id="pay">Agree & Pay</button>
+        </div>
+        <div class="error" id="error"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="summary" id="request-summary">
+        <div class="status">No request loaded</div>
+      </div>
+      <div class="participants" id="participants"></div>
+    </section>
+  </main>
+
+  <script>
+    const apiKey = new URLSearchParams(window.location.search).get("api_key") || localStorage.getItem("apiKey") || "";
+    if (apiKey) {
+      localStorage.setItem("apiKey", apiKey);
+    }
+
+    function buildHeaders() {
+      const headers = { "Content-Type": "application/json" };
+      if (apiKey) {
+        headers["X-API-Key"] = apiKey;
+      }
+      return headers;
+    }
+
+    const handleSelect = document.getElementById("handle");
+    const requestInput = document.getElementById("request");
+    const summary = document.getElementById("request-summary");
+    const participantsEl = document.getElementById("participants");
+    const errorEl = document.getElementById("error");
+    const modeEl = document.getElementById("mode");
+
+    let currentRequest = null;
+
+    document.getElementById("load").addEventListener("click", loadRequest);
+    document.getElementById("pay").addEventListener("click", payShare);
+
+    async function boot() {
+      const params = new URLSearchParams(window.location.search);
+      const handle = params.get("handle");
+      const requestId = params.get("request_id");
+      const returnUrl = params.get("return_url");
+      const merchantPill = document.getElementById("merchant-pill");
+      await loadContacts();
+      await loadInfo();
+      if (handle) {
+        handleSelect.value = handle;
+      }
+      if (requestId) {
+        requestInput.value = requestId;
+        await loadRequest();
+      }
+      if (returnUrl) {
+        const button = document.createElement("a");
+        button.href = returnUrl;
+        button.textContent = "Return to merchant";
+        button.style.display = "inline-flex";
+        button.style.alignItems = "center";
+        button.style.justifyContent = "center";
+        button.style.marginTop = "8px";
+        button.style.padding = "10px 16px";
+        button.style.borderRadius = "999px";
+        button.style.background = "#f1b4b8";
+        button.style.color = "#1c1c1c";
+        button.style.textDecoration = "none";
+        summary.appendChild(button);
+      }
+      if (returnUrl) {
+        try {
+          const host = new URL(returnUrl).hostname;
+          if (host) {
+            merchantPill.textContent = `Paying ${host}`;
+            merchantPill.style.display = "inline-flex";
+          }
+        } catch (error) {
+          // Ignore invalid return URLs
+        }
+      }
+      setInterval(pollRequest, 4000);
+    }
+
+    async function loadInfo() {
+      const res = await fetch("/api/info");
+      const info = await res.json();
+      modeEl.textContent = `XRPL mode: ${info.xrpl_mode}`;
+    }
+
+    async function loadContacts() {
+      const res = await fetch("/api/contacts");
+      const contacts = await res.json();
+      handleSelect.innerHTML = "";
+      contacts.forEach((contact) => {
+        const option = document.createElement("option");
+        option.value = contact.handle;
+        option.textContent = `@${contact.handle}`;
+        handleSelect.appendChild(option);
+      });
+    }
+
+    async function loadRequest() {
+      errorEl.textContent = "";
+      const id = requestInput.value.trim();
+      if (!id) {
+        errorEl.textContent = "Enter a request ID.";
+        return;
+      }
+      const res = await fetch(`/api/requests/${id}`);
+      if (!res.ok) {
+        errorEl.textContent = "Request not found.";
+        return;
+      }
+      currentRequest = await res.json();
+      renderRequest();
+    }
+
+    async function pollRequest() {
+      if (!currentRequest) return;
+      const res = await fetch(`/api/requests/${currentRequest.id}`);
+      if (res.ok) {
+        currentRequest = await res.json();
+        renderRequest();
+      }
+    }
+
+    function renderRequest() {
+      if (!currentRequest) {
+        summary.innerHTML = "<div class=\"status\">No request loaded</div>";
+        participantsEl.innerHTML = "";
+        return;
+      }
+      summary.innerHTML = `
+        <div class="status">${currentRequest.status}</div>
+        <div><strong>Order</strong>: ${currentRequest.order_id}</div>
+        <div><strong>Deadline</strong>: ${new Date(currentRequest.deadline).toLocaleString()}</div>
+        <div><strong>Terms Hash</strong>: ${currentRequest.terms_hash.slice(0, 10)}...</div>
+      `;
+      participantsEl.innerHTML = "";
+      currentRequest.participants.forEach((participant) => {
+        const row = document.createElement("div");
+        row.className = "participant";
+        row.innerHTML = `
+          <div>@${participant.handle} · ${participant.amount_xrp.toFixed(2)} XRP</div>
+          <div class="status ${statusClass(participant.status)}">${participant.status}</div>
+        `;
+        participantsEl.appendChild(row);
+      });
+    }
+
+    function statusClass(status) {
+      if (status === "ESCROWED") return "escrowed";
+      if (status === "FINISHED") return "finished";
+      if (status === "REFUNDED") return "refunded";
+      return "";
+    }
+
+    async function payShare() {
+      errorEl.textContent = "";
+      if (!currentRequest) {
+        errorEl.textContent = "Load a request first.";
+        return;
+      }
+      const handle = handleSelect.value;
+      const res = await fetch(`/api/requests/${currentRequest.id}/pay`, {
+        method: "POST",
+        headers: buildHeaders(),
+        body: JSON.stringify({ handle }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        errorEl.textContent = err.detail || "Payment failed.";
+        return;
+      }
+      currentRequest = await res.json();
+      renderRequest();
+    }
+
+    boot();
+  </script>
+</body>
+</html>

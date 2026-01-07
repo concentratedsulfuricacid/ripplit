@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+pydantic
+xrpl-py
+cryptoconditions
+python-dotenv

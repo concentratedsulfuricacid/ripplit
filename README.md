@@ -1,15 +1,74 @@
 # XRPL GroupPay Demo
 
-This repo contains a scaffolded demo project for an XRPL group payment flow.
+This repo contains a demo project for an XRPL group payment flow with escrow-based coordination.
 
 ## Structure
 
 - `project_structure.yaml`: File manifest used to generate the project tree.
-- `app/`: Python application modules.
-- `static/`: HTML assets.
+- `app/`: FastAPI backend and GroupPay logic.
+- `static/`: Marketplace and payer web views.
 - `requirements.txt`: Python dependencies.
 
-## Next steps
+## Run locally
 
-Fill in the Python modules under `app/` and expand this README with setup and
-usage instructions.
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+Open `http://127.0.0.1:8000/` to view the marketplace and create a GroupPay order.
+
+## XRPL configuration
+
+By default the app runs in `mock` mode so you can demo the flow without Testnet
+wallets. To use XRPL Testnet escrows, set these environment variables:
+
+- `XRPL_MODE=testnet`
+- `XRPL_JSON_RPC_URL=https://s.altnet.rippletest.net:51234`
+- `MERCHANT_ADDRESS=...`
+- `MERCHANT_SEED=...`
+- `DEMO_ALICE_ADDRESS=...`, `DEMO_ALICE_SEED=...`
+- `DEMO_BOB_ADDRESS=...`, `DEMO_BOB_SEED=...`
+- `DEMO_CHEN_ADDRESS=...`, `DEMO_CHEN_SEED=...`
+
+The app uses canonical PREIMAGE-SHA-256 crypto-conditions via `cryptoconditions`.
+
+## Ledger polling and DID registry
+
+When `XRPL_MODE=testnet`, the backend polls the ledger (default every 8s) to:
+
+- detect EscrowCreate/Finish/Cancel transactions for the request
+- keep the order status in sync with on-ledger activity
+- refresh DID metadata for configured contacts
+
+You can configure polling with:
+
+- `LEDGER_POLL_SECONDS=8`
+- `ENABLE_LEDGER_POLLING=true`
+- `USE_LEDGER_DID=true`
+
+To publish an on-ledger DID for a handle:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/did/register \
+  -H "Content-Type: application/json" \
+  -d '{"handle":"alice"}'
+```
+
+## API key auth (optional)
+
+If you set `API_KEY=...`, write endpoints require the header `X-API-Key`.
+You can pass it to the UI by appending `?api_key=YOUR_KEY` to the URL.
+
+## Stripe-style redirect links
+
+When you create an order, the response includes `checkout_urls` for each payer:
+
+```
+/pay/{request_id}/{handle}
+```
+
+These redirect to the wallet page and can include `return_url` so payers can
+return to the originating site after completing payment.

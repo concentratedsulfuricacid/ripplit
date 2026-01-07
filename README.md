@@ -6,7 +6,7 @@ This repo contains a demo project for an XRPL group payment flow with escrow-bas
 
 - `project_structure.yaml`: File manifest used to generate the project tree.
 - `app/`: FastAPI backend and GroupPay logic.
-- `static/`: Marketplace and payer web views.
+- `static/`: Hosted checkout and payer web views.
 - `requirements.txt`: Python dependencies.
 
 ## Run locally
@@ -18,7 +18,20 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Open `http://127.0.0.1:8000/` to view the marketplace and create a GroupPay order.
+Open `http://127.0.0.1:8000/` to view the hosted checkout.
+
+## Hosted checkout (redirect)
+
+The root page behaves like a Stripe/PayPal-style hosted checkout. You can pass
+merchant context as query params so the UI looks like a redirect from a store:
+
+```
+http://127.0.0.1:8000/?merchant=Amazon&order_id=ORDER-123&product_id=ticket&quantity=2&return_url=https://merchant.example.com/return
+```
+
+- If `product_id` is provided, the item and quantity are locked.
+- If `return_url` is provided, the checkout shows a “Return to merchant” link.
+- If `API_KEY` is set, append `&api_key=YOUR_KEY` so the UI can call write APIs.
 
 ## XRPL configuration
 
@@ -54,6 +67,7 @@ To publish an on-ledger DID for a handle:
 ```bash
 curl -X POST http://127.0.0.1:8000/api/did/register \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_KEY" \
   -d '{"handle":"alice"}'
 ```
 
@@ -64,7 +78,8 @@ You can pass it to the UI by appending `?api_key=YOUR_KEY` to the URL.
 
 ## Stripe-style redirect links
 
-When you create an order, the response includes `checkout_urls` for each payer:
+If a merchant backend creates the order, the response includes `checkout_urls`
+for each payer:
 
 ```
 /pay/{request_id}/{handle}
@@ -72,3 +87,19 @@ When you create an order, the response includes `checkout_urls` for each payer:
 
 These redirect to the wallet page and can include `return_url` so payers can
 return to the originating site after completing payment.
+
+### Merchant API example
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/orders \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_KEY" \
+  -d '{
+    "product_id": "ticket",
+    "quantity": 1,
+    "participants": ["alice", "bob", "chen"],
+    "split": "equal",
+    "deadline_minutes": 15,
+    "return_url": "https://merchant.example.com/return"
+  }'
+```

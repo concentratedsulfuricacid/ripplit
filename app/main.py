@@ -60,17 +60,25 @@ async def startup() -> None:
 
 
 @app.get("/")
-async def root() -> RedirectResponse:
-    return RedirectResponse(url="/static/marketplace.html")
+async def root(request: Request) -> RedirectResponse:
+    url = "/static/marketplace.html"
+    if request.url.query:
+        url += f"?{request.url.query}"
+    return RedirectResponse(url=url)
 
 
 @app.get("/pay/{request_id}/{handle}")
 async def pay_redirect(
-    request_id: str, handle: str, return_url: Optional[str] = None
+    request_id: str,
+    handle: str,
+    return_url: Optional[str] = None,
+    api_key: Optional[str] = None,
 ) -> RedirectResponse:
     url = f"/static/wallet.html?request_id={request_id}&handle={handle}"
     if return_url:
         url += f"&return_url={return_url}"
+    if api_key:
+        url += f"&api_key={api_key}"
     return RedirectResponse(url=url)
 
 

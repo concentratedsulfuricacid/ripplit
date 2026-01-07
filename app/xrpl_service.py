@@ -45,6 +45,15 @@ class XrplService:
             ) from exc
         self._client = JsonRpcClient(self.settings.xrpl_json_rpc_url)
 
+    def _wallet_from_seed(self, seed: str):
+        from xrpl.wallet import Wallet
+        from xrpl.core.keypairs.main import CryptoAlgorithm
+
+        algorithm = (
+            CryptoAlgorithm.ED25519 if seed.startswith("sEd") else CryptoAlgorithm.SECP256K1
+        )
+        return Wallet.from_seed(seed, algorithm=algorithm)
+
     def _raw_request(self, method: str, params: Dict[str, Any]) -> Dict[str, Any]:
         payload = json.dumps({"method": method, "params": [params]}).encode("utf-8")
         req = urllib.request.Request(
@@ -65,7 +74,7 @@ class XrplService:
         preimage = uuid4().bytes + uuid4().bytes
         condition = PreimageSha256(preimage=preimage)
         condition_hex = binascii.hexlify(condition.condition_binary).decode("utf-8").upper()
-        fulfillment_hex = binascii.hexlify(condition.fulfillment_binary).decode("utf-8").upper()
+        fulfillment_hex = binascii.hexlify(condition.serialize_binary()).decode("utf-8").upper()
         return {"condition": condition_hex, "fulfillment": fulfillment_hex}
 
     def create_escrow(
@@ -256,9 +265,9 @@ class XrplService:
             raise XrplServiceError("XRPL client not initialized")
         from xrpl.wallet import Wallet
         from xrpl.models.transactions import EscrowCreate
-        from xrpl.transaction import safe_sign_and_autofill_transaction, submit_and_wait
+        from xrpl.transaction import submit_and_wait
 
-        wallet = Wallet(seed=payer_seed, sequence=0)
+        wallet = self._wallet_from_seed(payer_seed)
         tx = EscrowCreate(
             account=wallet.classic_address,
             amount=amount_drops,
@@ -266,8 +275,7 @@ class XrplService:
             cancel_after=cancel_after,
             condition=condition,
         )
-        signed = safe_sign_and_autofill_transaction(tx, wallet, self._client)
-        result = submit_and_wait(signed, self._client).result
+        result = submit_and_wait(tx, self._client, wallet).result
         tx_hash = result.get("hash", uuid4().hex)
         offer_sequence = result.get("tx_json", {}).get("Sequence")
         if offer_sequence is None:
@@ -288,17 +296,16 @@ class XrplService:
             raise XrplServiceError("XRPL client not initialized")
         from xrpl.wallet import Wallet
         from xrpl.models.transactions import EscrowFinish
-        from xrpl.transaction import safe_sign_and_autofill_transaction, submit_and_wait
+        from xrpl.transaction import submit_and_wait
 
-        wallet = Wallet(seed=merchant_seed, sequence=0)
+        wallet = self._wallet_from_seed(merchant_seed)
         tx = EscrowFinish(
             account=wallet.classic_address,
             owner=owner_address,
             offer_sequence=offer_sequence,
             fulfillment=fulfillment,
         )
-        signed = safe_sign_and_autofill_transaction(tx, wallet, self._client)
-        result = submit_and_wait(signed, self._client).result
+        result = submit_and_wait(tx, self._client, wallet).result
         tx_hash = result.get("hash", uuid4().hex)
         return TxSubmitResult(tx_hash=tx_hash, validated=result.get("validated", False))
 
@@ -314,16 +321,15 @@ class XrplService:
             raise XrplServiceError("XRPL client not initialized")
         from xrpl.wallet import Wallet
         from xrpl.models.transactions import EscrowCancel
-        from xrpl.transaction import safe_sign_and_autofill_transaction, submit_and_wait
+        from xrpl.transaction import submit_and_wait
 
-        wallet = Wallet(seed=merchant_seed, sequence=0)
+        wallet = self._wallet_from_seed(merchant_seed)
         tx = EscrowCancel(
             account=wallet.classic_address,
             owner=owner_address,
             offer_sequence=offer_sequence,
         )
-        signed = safe_sign_and_autofill_transaction(tx, wallet, self._client)
-        result = submit_and_wait(signed, self._client).result
+        result = submit_and_wait(tx, self._client, wallet).result
         tx_hash = result.get("hash", uuid4().hex)
         return TxSubmitResult(tx_hash=tx_hash, validated=result.get("validated", False))
 

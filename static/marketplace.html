@@ -617,14 +617,21 @@
         if (state.returnUrl) {
           url.searchParams.set("return_url", state.returnUrl);
         }
+        if (apiKey) {
+          url.searchParams.set("api_key", apiKey);
+        }
         link.href = url.toString();
         link.textContent = `@${participant.handle} wallet`;
         link.target = "_blank";
         payerLinks.appendChild(link);
 
         const checkoutLink = document.createElement("a");
-        const checkoutUrl = state.checkoutUrls[participant.handle] || link.href;
-        checkoutLink.href = checkoutUrl;
+        const checkoutBase = state.checkoutUrls[participant.handle] || link.href;
+        const checkoutUrl = new URL(checkoutBase, window.location.origin);
+        if (apiKey && !checkoutUrl.searchParams.has("api_key")) {
+          checkoutUrl.searchParams.set("api_key", apiKey);
+        }
+        checkoutLink.href = checkoutUrl.toString();
         checkoutLink.textContent = `Pay as @${participant.handle} (redirect)`;
         checkoutLink.target = "_blank";
         payerLinks.appendChild(checkoutLink);

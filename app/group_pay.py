@@ -94,9 +94,9 @@ class GroupPayService:
         self.state.save_group_request(request)
         return request
 
-    def pay_share(self, request_id: str, handle: str) -> GroupRequest:
+    async def pay_share(self, request_id: str, handle: str) -> GroupRequest:
         request = self.state.get_group_request(request_id)
-        self._expire_if_needed(request)
+        await self._expire_if_needed(request)
         if request.status in {GroupStatus.PAID, GroupStatus.EXPIRED}:
             raise ValueError("Request is no longer payable")
         participant = self._get_participant(request, handle)
@@ -108,7 +108,7 @@ class GroupPayService:
             raise XrplServiceError(f"Missing seed for {handle} in XRPL mode")
 
         cancel_after = to_ripple_time(request.deadline)
-        escrow_result = self.xrpl.create_escrow(
+        escrow_result = await self.xrpl.create_escrow(
             payer_seed=seed or "",
             payer_address=participant.address,
             amount_drops=participant.amount_drops,
@@ -121,25 +121,25 @@ class GroupPayService:
         participant.escrow = self._new_escrow(participant.address, event, request.condition)
         request.status = GroupStatus.FUNDING
         self.state.save_group_request(request)
-        self._maybe_finish(request)
+        await self._maybe_finish(request)
         return request
 
-    def finish_request(self, request_id: str) -> GroupRequest:
+    async def finish_request(self, request_id: str) -> GroupRequest:
         request = self.state.get_group_request(request_id)
-        self._finish_all(request)
+        await self._finish_all(request)
         return request
 
-    def refresh_request(self, request_id: str) -> GroupRequest:
+    async def refresh_request(self, request_id: str) -> GroupRequest:
         request = self.state.get_group_request(request_id)
         self.sync_with_ledger(requests=[request])
-        self._expire_if_needed(request)
+        await self._expire_if_needed(request)
         return request
 
-    def list_requests(self) -> List[GroupRequest]:
+    async def list_requests(self) -> List[GroupRequest]:
         requests = self.state.list_group_requests()
         self.sync_with_ledger(requests=requests)
         for request in requests:
-            self._expire_if_needed(request)
+            await self._expire_if_needed(request)
         return requests
 
     def sync_with_ledger(self, requests: Optional[List[GroupRequest]] = None) -> None:
@@ -251,15 +251,15 @@ class GroupPayService:
                 return participant
         raise ValueError(f"Handle {handle} not part of request")
 
-    def _maybe_finish(self, request: GroupRequest) -> None:
+    async def _maybe_finish(self, request: GroupRequest) -> None:
         if not self.settings.auto_finish:
             return
         if any(p.status != ParticipantStatus.ESCROWED for p in request.participants):
             return
         request.status = GroupStatus.READY
-        self._finish_all(request)
+        await self._finish_all(request)
 
-    def _finish_all(self, request: GroupRequest) -> None:
+    async def _finish_all(self, request: GroupRequest) -> None:
         if request.status in {GroupStatus.PAID, GroupStatus.EXPIRED}:
             return
         if any(p.status == ParticipantStatus.UNPAID for p in request.participants):
@@ -269,11 +269,12 @@ class GroupPayService:
         for participant in request.participants:
             if participant.status != ParticipantStatus.ESCROWED or not participant.escrow:
                 continue
-            result = self.xrpl.finish_escrow(
+            result = await self.xrpl.finish_escrow(
                 merchant_seed=self.settings.merchant_seed,
                 owner_address=participant.address,
                 offer_sequence=participant.escrow.offer_sequence,
                 fulfillment=request.fulfillment,
+                condition=request.condition,
             )
             if result.validated:
                 participant.status = ParticipantStatus.FINISHED
@@ -286,14 +287,14 @@ class GroupPayService:
             self.state.save_order(order)
         self.state.save_group_request(request)
 
-    def _expire_if_needed(self, request: GroupRequest) -> None:
+    async def _expire_if_needed(self, request: GroupRequest) -> None:
         if request.status in {GroupStatus.PAID, GroupStatus.EXPIRED}:
             return
         if datetime.now(timezone.utc) <= request.deadline:
             return
         for participant in request.participants:
             if participant.escrow and participant.status == ParticipantStatus.ESCROWED:
-                result = self.xrpl.cancel_escrow(
+                result = await self.xrpl.cancel_escrow(
                     merchant_seed=self.settings.merchant_seed,
                     owner_address=participant.address,
                     offer_sequence=participant.escrow.offer_sequence,

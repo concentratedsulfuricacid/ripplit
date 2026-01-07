@@ -165,13 +165,13 @@ async def get_order(order_id: str):
 
 @app.get("/api/requests")
 async def list_requests():
-    return group_pay.list_requests()
+    return await group_pay.list_requests()
 
 
 @app.get("/api/requests/{request_id}")
 async def get_request(request_id: str):
     try:
-        return group_pay.refresh_request(request_id)
+        return await group_pay.refresh_request(request_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Request not found") from exc
 
@@ -181,7 +181,7 @@ async def pay_share(
     request_id: str, payload: PayShareRequest, _: None = Depends(require_api_key)
 ):
     try:
-        return group_pay.pay_share(request_id, payload.handle)
+        return await group_pay.pay_share(request_id, payload.handle)
     except (KeyError, ValueError, XrplServiceError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -189,6 +189,6 @@ async def pay_share(
 @app.post("/api/requests/{request_id}/finish")
 async def finish_request(request_id: str, _: None = Depends(require_api_key)):
     try:
-        return group_pay.finish_request(request_id)
+        return await group_pay.finish_request(request_id)
     except (KeyError, XrplServiceError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

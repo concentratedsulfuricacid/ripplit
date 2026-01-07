@@ -38,12 +38,12 @@ class XrplService:
 
     def _init_client(self) -> None:
         try:
-            from xrpl.clients import JsonRpcClient
+            from xrpl.asyncio.clients import AsyncJsonRpcClient
         except ImportError as exc:
             raise XrplServiceError(
                 "xrpl-py is required for XRPL mode 'testnet'. Install requirements.txt"
             ) from exc
-        self._client = JsonRpcClient(self.settings.xrpl_json_rpc_url)
+        self._client = AsyncJsonRpcClient(self.settings.xrpl_json_rpc_url)
 
     def _wallet_from_seed(self, seed: str):
         from xrpl.wallet import Wallet
@@ -77,7 +77,7 @@ class XrplService:
         fulfillment_hex = binascii.hexlify(condition.serialize_binary()).decode("utf-8").upper()
         return {"condition": condition_hex, "fulfillment": fulfillment_hex}
 
-    def create_escrow(
+    async def create_escrow(
         self,
         payer_seed: str,
         payer_address: str,
@@ -88,7 +88,7 @@ class XrplService:
     ) -> EscrowResult:
         if self.mode == "mock":
             return self._mock_create_escrow(payer_address)
-        return self._real_create_escrow(
+        return await self._real_create_escrow(
             payer_seed,
             payer_address,
             amount_drops,
@@ -97,18 +97,21 @@ class XrplService:
             condition,
         )
 
-    def finish_escrow(
+    async def finish_escrow(
         self,
         merchant_seed: str,
         owner_address: str,
         offer_sequence: int,
         fulfillment: Optional[str],
+        condition: Optional[str],
     ) -> TxSubmitResult:
         if self.mode == "mock":
             return self._mock_finish_escrow()
-        return self._real_finish_escrow(merchant_seed, owner_address, offer_sequence, fulfillment)
+        return await self._real_finish_escrow(
+            merchant_seed, owner_address, offer_sequence, fulfillment, condition
+        )
 
-    def cancel_escrow(
+    async def cancel_escrow(
         self,
         merchant_seed: str,
         owner_address: str,
@@ -116,7 +119,7 @@ class XrplService:
     ) -> TxSubmitResult:
         if self.mode == "mock":
             return self._mock_cancel_escrow()
-        return self._real_cancel_escrow(merchant_seed, owner_address, offer_sequence)
+        return await self._real_cancel_escrow(merchant_seed, owner_address, offer_sequence)
 
     def submit_did_set(self, seed: str, address: str, did_document: str, uri: str) -> TxSubmitResult:
         if self.mode == "mock":
@@ -250,7 +253,7 @@ class XrplService:
     def _mock_cancel_escrow(self) -> TxSubmitResult:
         return TxSubmitResult(tx_hash=uuid4().hex, validated=True)
 
-    def _real_create_escrow(
+    async def _real_create_escrow(
         self,
         payer_seed: str,
         payer_address: str,
@@ -263,9 +266,8 @@ class XrplService:
             raise XrplServiceError("Missing payer seed for XRPL escrow create")
         if not self._client:
             raise XrplServiceError("XRPL client not initialized")
-        from xrpl.wallet import Wallet
         from xrpl.models.transactions import EscrowCreate
-        from xrpl.transaction import submit_and_wait
+        from xrpl.asyncio.transaction import submit_and_wait
 
         wallet = self._wallet_from_seed(payer_seed)
         tx = EscrowCreate(
@@ -275,28 +277,29 @@ class XrplService:
             cancel_after=cancel_after,
             condition=condition,
         )
-        result = submit_and_wait(tx, self._client, wallet).result
+        response = await submit_and_wait(tx, self._client, wallet)
+        result = response.result
         tx_hash = result.get("hash", uuid4().hex)
         offer_sequence = result.get("tx_json", {}).get("Sequence")
         if offer_sequence is None:
-            offer_sequence = signed.sequence
+            offer_sequence = tx.sequence
         validated = result.get("validated", False)
         return EscrowResult(offer_sequence=int(offer_sequence), tx_hash=tx_hash, validated=validated)
 
-    def _real_finish_escrow(
+    async def _real_finish_escrow(
         self,
         merchant_seed: str,
         owner_address: str,
         offer_sequence: int,
         fulfillment: Optional[str],
+        condition: Optional[str],
     ) -> TxSubmitResult:
         if not merchant_seed:
             raise XrplServiceError("Missing merchant seed for XRPL escrow finish")
         if not self._client:
             raise XrplServiceError("XRPL client not initialized")
-        from xrpl.wallet import Wallet
         from xrpl.models.transactions import EscrowFinish
-        from xrpl.transaction import submit_and_wait
+        from xrpl.asyncio.transaction import submit_and_wait
 
         wallet = self._wallet_from_seed(merchant_seed)
         tx = EscrowFinish(
@@ -304,12 +307,14 @@ class XrplService:
             owner=owner_address,
             offer_sequence=offer_sequence,
             fulfillment=fulfillment,
+            condition=condition,
         )
-        result = submit_and_wait(tx, self._client, wallet).result
+        response = await submit_and_wait(tx, self._client, wallet)
+        result = response.result
         tx_hash = result.get("hash", uuid4().hex)
         return TxSubmitResult(tx_hash=tx_hash, validated=result.get("validated", False))
 
-    def _real_cancel_escrow(
+    async def _real_cancel_escrow(
         self,
         merchant_seed: str,
         owner_address: str,
@@ -319,9 +324,8 @@ class XrplService:
             raise XrplServiceError("Missing merchant seed for XRPL escrow cancel")
         if not self._client:
             raise XrplServiceError("XRPL client not initialized")
-        from xrpl.wallet import Wallet
         from xrpl.models.transactions import EscrowCancel
-        from xrpl.transaction import submit_and_wait
+        from xrpl.asyncio.transaction import submit_and_wait
 
         wallet = self._wallet_from_seed(merchant_seed)
         tx = EscrowCancel(
@@ -329,7 +333,8 @@ class XrplService:
             owner=owner_address,
             offer_sequence=offer_sequence,
         )
-        result = submit_and_wait(tx, self._client, wallet).result
+        response = await submit_and_wait(tx, self._client, wallet)
+        result = response.result
         tx_hash = result.get("hash", uuid4().hex)
         return TxSubmitResult(tx_hash=tx_hash, validated=result.get("validated", False))
 

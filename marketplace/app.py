@@ -28,6 +28,25 @@ MARKETPLACE_NAME = os.getenv("MARKETPLACE_NAME", "Nimbus Market")
 
 
 
+# def _build_redirect(order: Dict[str, Any]) -> str:
+#     items = order.get("items") or []
+#     if not items:
+#         return ""
+#     item = items[0]
+#     return_url = f"{MARKETPLACE_BASE}/api/order/ripplit_callback"
+#     params = {
+#         "merchant": MARKETPLACE_NAME,
+#         "order_id": order.get("order_id"),
+#         "product_id": item.get("sku"),
+#         "quantity": item.get("qty"),
+#         "total_xrp": order.get("total_xrp"),
+#         "return_url": return_url,
+#         "merchant_url": MARKETPLACE_BASE,
+#         "api_base": RIPPLIT_API_BASE,
+#     }
+#     if RIPPLIT_API_KEY:
+#         params["api_key"] = RIPPLIT_API_KEY
+#     return f"{RIPPLIT_PAY_URL}?{urlencode(params)}"
 def _build_redirect(order: Dict[str, Any]) -> str:
     items = order.get("items") or []
     if not items:
@@ -39,7 +58,11 @@ def _build_redirect(order: Dict[str, Any]) -> str:
         "order_id": order.get("order_id"),
         "product_id": item.get("sku"),
         "quantity": item.get("qty"),
-        "total_xrp": order.get("total_xrp"),
+
+        # NEW:
+        "total_rlusd": order.get("total_rlusd"),
+        "currency": order.get("currency", "RLUSD"),
+
         "return_url": return_url,
         "merchant_url": MARKETPLACE_BASE,
         "api_base": RIPPLIT_API_BASE,
@@ -49,11 +72,19 @@ def _build_redirect(order: Dict[str, Any]) -> str:
     return f"{RIPPLIT_PAY_URL}?{urlencode(params)}"
 
 
+
+# class CartItem(BaseModel):
+#     sku: str
+#     name: str
+#     unit_price_xrp: float
+#     qty: int
+
 class CartItem(BaseModel):
     sku: str
     name: str
-    unit_price_xrp: float
+    unit_price_rlusd: float
     qty: int
+
 
 
 class CreateOrderReq(BaseModel):
@@ -79,6 +110,31 @@ def list_orders():
     return {"orders": [{**o, "redirect_url": _build_redirect(o)} for o in orders]}
 
 
+# @app.post("/api/order/create")
+# def create_order(req: CreateOrderReq):
+#     if not req.items:
+#         return {"error": "Cart is empty"}
+#     if len(req.items) != 1:
+#         return {"error": "GroupPay demo supports one item per checkout."}
+
+#     total = 0.0
+#     for it in req.items:
+#         total += float(it.unit_price_xrp) * int(it.qty)
+
+#     order_id = f"ord_{str(uuid.uuid4())[:8]}"
+#     order = {
+#         "order_id": order_id,
+#         "items": [it.model_dump() for it in req.items],
+#         "total_xrp": round(total, 6),
+#         "status": "PENDING_GROUPPAY",
+#         "details": None,
+#     }
+#     ORDERS[order_id] = order
+
+#     redirect_url = _build_redirect(order)
+
+#     return {"order": order, "redirect_url": redirect_url}
+
 @app.post("/api/order/create")
 def create_order(req: CreateOrderReq):
     if not req.items:
@@ -88,21 +144,22 @@ def create_order(req: CreateOrderReq):
 
     total = 0.0
     for it in req.items:
-        total += float(it.unit_price_xrp) * int(it.qty)
+        total += float(it.unit_price_rlusd) * int(it.qty)
 
     order_id = f"ord_{str(uuid.uuid4())[:8]}"
     order = {
         "order_id": order_id,
         "items": [it.model_dump() for it in req.items],
-        "total_xrp": round(total, 6),
+        "total_rlusd": round(total, 6),
+        "currency": "RLUSD",
         "status": "PENDING_GROUPPAY",
         "details": None,
     }
     ORDERS[order_id] = order
 
     redirect_url = _build_redirect(order)
-
     return {"order": order, "redirect_url": redirect_url}
+
 
 
 @app.post("/api/order/ripplit_callback")

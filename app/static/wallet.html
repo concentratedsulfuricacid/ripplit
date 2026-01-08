@@ -67,6 +67,12 @@
     }
     .small{ font-size:12px; color:var(--muted); margin-top:2px; }
 
+    .fxRow{ display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
+    .fxField{ flex:1; min-width:220px; }
+    .fxSelect{ background:#f8fafc; border:1px solid var(--border); border-radius:12px; padding:8px 10px; font-weight:900; color:var(--text); }
+    .fxInput{ width:100%; background:#ffffff; border:1px solid var(--border); border-radius:12px; padding:8px 10px; font-weight:900; color:var(--text); }
+    .fxOutput{ margin-top:6px; font-size:22px; font-weight:900; }
+
   </style>
 </head>
 <body>
@@ -107,6 +113,37 @@
     </div>
   </div>
   
+  <div class="card" style="margin-top:14px" id="fxCard">
+    <div class="cardHeader">
+      <div style="font-weight:950">Real-time FX</div>
+      <div class="tag" id="fxStatus">Loading…</div>
+    </div>
+    <div class="cardBody">
+      <div class="fxRow">
+        <div class="fxField">
+          <div class="muted" style="font-size:12px">From</div>
+          <div class="row" style="gap:8px; align-items:center;">
+            <select id="fxCurrency" class="fxSelect">
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="SGD">SGD</option>
+            </select>
+            <input id="fxAmount" class="fxInput" type="number" min="0" step="0.01" value="1.00" />
+          </div>
+        </div>
+        <div style="display:flex; align-items:center;">
+          <button class="btn" id="fxToggle">USD → XRP</button>
+        </div>
+        <div class="fxField">
+          <div class="muted" style="font-size:12px">To</div>
+          <div class="fxOutput" id="fxResult">—</div>
+        </div>
+      </div>
+      <div class="small" id="fxRate">Rate: —</div>
+      <div class="small" id="fxUpdated">Last updated: —</div>
+    </div>
+  </div>
+
   <div class="card" style="margin-top:14px">
     <div class="cardHeader">
       <div style="font-weight:950">Transaction History</div>
@@ -339,6 +376,136 @@ function renderRightPanel(){
   }
 }
 
+
+const fxState = {
+  direction: "fiat_to_xrp",
+  rates: {},
+  lastUpdated: null,
+  timer: null,
+};
+
+const fxAnim = {
+  current: null,
+  target: null,
+  raf: null,
+  lastTs: null,
+};
+
+function animateFxValue(target, formatter){
+  fxAnim.target = target;
+  if (fxAnim.current == null) {
+    fxAnim.current = target;
+  }
+  const start = fxAnim.current;
+  const diff = target - start;
+  const duration = 500;
+
+  if (fxAnim.raf) cancelAnimationFrame(fxAnim.raf);
+  fxAnim.lastTs = null;
+
+  const step = (ts) => {
+    if (!fxAnim.lastTs) fxAnim.lastTs = ts;
+    const t = Math.min(1, (ts - fxAnim.lastTs) / duration);
+    const eased = 1 - Math.pow(1 - t, 3);
+    const val = start + diff * eased;
+    document.getElementById("fxResult").textContent = formatter(val);
+    if (t < 1) {
+      fxAnim.raf = requestAnimationFrame(step);
+    } else {
+      fxAnim.current = target;
+      fxAnim.raf = null;
+    }
+  };
+  fxAnim.raf = requestAnimationFrame(step);
+}
+
+function fmtFxTime(ts){
+  if(!ts) return "—";
+  return new Date(ts).toLocaleTimeString();
+}
+
+function fxRateFor(){
+  const cur = document.getElementById("fxCurrency").value;
+  return fxState.rates[cur];
+}
+
+function updateFxLabels(){
+  const cur = document.getElementById("fxCurrency").value;
+  const btn = document.getElementById("fxToggle");
+  if(fxState.direction === "fiat_to_xrp"){
+    btn.textContent = `${cur} → XRP`;
+  } else {
+    btn.textContent = `XRP → ${cur}`;
+  }
+}
+
+function updateFxDisplay(){
+  const cur = document.getElementById("fxCurrency").value;
+  const amount = parseFloat(document.getElementById("fxAmount").value || "0");
+  const rate = fxRateFor();
+  const result = document.getElementById("fxResult");
+  const rateLine = document.getElementById("fxRate");
+
+  if(!rate){
+    result.textContent = "—";
+    fxAnim.current = null;
+    rateLine.textContent = `Rate: —`;
+    return;
+  }
+
+  if(fxState.direction === "fiat_to_xrp"){
+    const xrp = rate ? (amount / rate) : 0;
+    animateFxValue(xrp, (val) => `${val.toFixed(6)} XRP`);
+    rateLine.textContent = `Rate: 1 XRP = ${rate.toFixed(6)} ${cur}`;
+  } else {
+    const fiat = amount * rate;
+    animateFxValue(fiat, (val) => `${val.toFixed(2)} ${cur}`);
+    rateLine.textContent = `Rate: 1 XRP = ${rate.toFixed(6)} ${cur}`;
+  }
+}
+
+async function fetchFxRates(){
+  const status = document.getElementById("fxStatus");
+  try {
+    const res = await fetch("https://api.coinbase.com/v2/exchange-rates?currency=XRP");
+    const data = await res.json();
+    const rates = data?.data?.rates || {};
+    fxState.rates = {
+      USD: parseFloat(rates.USD || ""),
+      EUR: parseFloat(rates.EUR || ""),
+      SGD: parseFloat(rates.SGD || ""),
+    };
+    fxState.lastUpdated = Date.now();
+    status.textContent = "Live";
+  } catch (err) {
+    status.textContent = "Offline";
+  }
+  document.getElementById("fxUpdated").textContent = `Last updated: ${fmtFxTime(fxState.lastUpdated)}`;
+  updateFxLabels();
+  updateFxDisplay();
+}
+
+function initFx(){
+  if(fxState.timer) return;
+  const currency = document.getElementById("fxCurrency");
+  const amount = document.getElementById("fxAmount");
+  const toggle = document.getElementById("fxToggle");
+
+  currency.addEventListener("change", () => {
+    updateFxLabels();
+    updateFxDisplay();
+  });
+  amount.addEventListener("input", updateFxDisplay);
+  toggle.addEventListener("click", () => {
+    fxState.direction = fxState.direction === "fiat_to_xrp" ? "xrp_to_fiat" : "fiat_to_xrp";
+    updateFxLabels();
+    updateFxDisplay();
+  });
+
+  fetchFxRates();
+  fxState.timer = setInterval(fetchFxRates, 30000);
+}
+
 async function refreshAll(){
   if(!user){
     window.location.href = "/static/login.html";
@@ -346,6 +513,7 @@ async function refreshAll(){
   }
   renderRightPanel();
   await refreshBalance();
+  initFx();
 
   // NEW: always load history for everyone
   await loadHistory();

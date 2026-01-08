@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="950" viewBox="0 0 1600 950">
+  <defs>
+    <style>
+      .bg { fill: #ffffff; }
+      .title { font: 700 28px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; fill: #0f172a; }
+      .subtitle { font: 400 14px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; fill: #475569; }
+      .lane { fill: #f8fafc; stroke: #e2e8f0; stroke-width: 1; }
+      .laneLabel { font: 700 13px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; fill: #334155; }
+      .box { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1.2; rx: 14; }
+      .boxTitle { font: 700 14px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; fill: #0f172a; }
+      .boxText { font: 400 12.5px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; fill: #475569; }
+      .chip { fill: #eef2ff; stroke: #c7d2fe; stroke-width: 1; rx: 999; }
+      .chipText { font: 700 11.5px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; fill: #3730a3; }
+      .arrow { stroke: #334155; stroke-width: 2; fill: none; }
+      .arrowSoft { stroke: #64748b; stroke-width: 2; fill: none; }
+      .note { font: 400 12px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; fill: #64748b; }
+      .diamond { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1.2; }
+      .ok { fill: #ecfdf5; stroke: #86efac; }
+      .warn { fill: #fffbeb; stroke: #fcd34d; }
+      .bad { fill: #fef2f2; stroke: #fca5a5; }
+    </style>
+
+    <marker id="arrowHead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,3 L0,6 Z" fill="#334155" />
+    </marker>
+    <marker id="arrowHeadSoft" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,3 L0,6 Z" fill="#64748b" />
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1600" height="950" />
+
+  <text class="title" x="800" y="60" text-anchor="middle">Ripplit – GroupPay User Flow</text>
+  <text class="subtitle" x="800" y="88" text-anchor="middle">Hosted checkout redirect, handle-based co-payers, XRPL Escrows, auto-finish + merchant callback</text>
+
+  <!-- Lanes -->
+  <rect class="lane" x="60" y="120" width="1480" height="140" />
+  <rect class="lane" x="60" y="280" width="1480" height="210" />
+  <rect class="lane" x="60" y="510" width="1480" height="170" />
+  <rect class="lane" x="60" y="700" width="1480" height="190" />
+
+  <text class="laneLabel" x="80" y="148">Merchant site (marketplace/)</text>
+  <text class="laneLabel" x="80" y="308">Ripplit hosted checkout (static/marketplace.html)</text>
+  <text class="laneLabel" x="80" y="538">Co-payers (static/copayer.html)</text>
+  <text class="laneLabel" x="80" y="728">XRPL Testnet + settlement</text>
+
+  <!-- Boxes: Merchant -->
+  <rect class="box" x="120" y="160" width="330" height="80" />
+  <text class="boxTitle" x="140" y="188">1) Buyer shops</text>
+  <text class="boxText" x="140" y="210">Add item to cart → Checkout</text>
+
+  <rect class="box" x="500" y="160" width="360" height="80" />
+  <text class="boxTitle" x="520" y="188">2) Merchant creates redirect</text>
+  <text class="boxText" x="520" y="210">POST /api/order/create → redirect_url</text>
+
+  <rect class="chip" x="890" y="172" width="330" height="26" />
+  <text class="chipText" x="905" y="191">redirect_url includes: order_id, product_id, total_xrp, api_key</text>
+
+  <!-- Boxes: Ripplit checkout -->
+  <rect class="box" x="920" y="320" width="520" height="90" />
+  <text class="boxTitle" x="940" y="348">3) Hosted checkout loads</text>
+  <text class="boxText" x="940" y="370">/static/marketplace.html reads query params</text>
+  <text class="boxText" x="940" y="392">Shows order context + co-payer toggles</text>
+
+  <rect class="box" x="120" y="320" width="360" height="90" />
+  <text class="boxTitle" x="140" y="348">4) Create GroupPay request</text>
+  <text class="boxText" x="140" y="370">POST /api/orders (X-API-Key)</text>
+  <text class="boxText" x="140" y="392">terms_hash + deadline + (optional) Condition+Fulfillment</text>
+
+  <rect class="box" x="520" y="320" width="360" height="90" />
+  <text class="boxTitle" x="540" y="348">5) Request enters FUNDING</text>
+  <text class="boxText" x="540" y="370">Each payer must lock their share</text>
+  <text class="boxText" x="540" y="392">Payer links open copayer page</text>
+
+  <rect class="box" x="520" y="420" width="360" height="54" />
+  <text class="boxTitle" x="540" y="450">Pay share</text>
+  <text class="boxText" x="540" y="470">POST /api/requests/{id}/pay (handle)</text>
+
+  <!-- Boxes: Copayers -->
+  <rect class="box" x="120" y="560" width="360" height="90" />
+  <text class="boxTitle" x="140" y="588">6) Co-payer opens link</text>
+  <text class="boxText" x="140" y="610">/static/copayer.html?request_id&handle</text>
+  <text class="boxText" x="140" y="632">Shows balance + all payer statuses</text>
+
+  <rect class="box" x="520" y="560" width="360" height="90" />
+  <text class="boxTitle" x="540" y="588">7) Co-payer pays share</text>
+  <text class="boxText" x="540" y="610">POST /api/requests/{id}/pay</text>
+  <text class="boxText" x="540" y="632">Creates an escrow on XRPL</text>
+
+  <!-- Boxes: XRPL -->
+  <rect class="box warn" x="120" y="760" width="360" height="90" />
+  <text class="boxTitle" x="140" y="788">8) XRPL EscrowCreate x N</text>
+  <text class="boxText" x="140" y="810">Each payer submits EscrowCreate</text>
+  <text class="boxText" x="140" y="832">Destination = merchant address</text>
+
+  <rect class="diamond" x="520" y="770" width="140" height="140" transform="rotate(45 590 840)" />
+  <text class="boxTitle" x="590" y="835" text-anchor="middle">All</text>
+  <text class="boxTitle" x="590" y="855" text-anchor="middle">ESCROWED?</text>
+
+  <rect class="box ok" x="730" y="760" width="360" height="90" />
+  <text class="boxTitle" x="750" y="788">9) Auto-finish (if enabled)</text>
+  <text class="boxText" x="750" y="810">Backend submits EscrowFinish x N</text>
+  <text class="boxText" x="750" y="832">Includes fulfillment if Condition is set</text>
+
+  <rect class="box ok" x="1130" y="760" width="310" height="90" />
+  <text class="boxTitle" x="1150" y="788">10) Order PAID</text>
+  <text class="boxText" x="1150" y="810">Funds released to merchant</text>
+  <text class="boxText" x="1150" y="832">UI shows PAID</text>
+
+  <rect class="box" x="1130" y="860" width="310" height="70" />
+  <text class="boxTitle" x="1150" y="888">11) Merchant callback</text>
+  <text class="boxText" x="1150" y="910">POST return_url (order_id, status, details)</text>
+
+  <rect class="box bad" x="730" y="860" width="360" height="70" />
+  <text class="boxTitle" x="750" y="888">If deadline passes</text>
+  <text class="boxText" x="750" y="910">EXPIRED → EscrowCancel returns funds</text>
+
+  <!-- Arrows -->
+  <path class="arrow" d="M450 200 L500 200" marker-end="url(#arrowHead)" />
+  <path class="arrow" d="M860 200 L920 200" marker-end="url(#arrowHead)" />
+  <path class="arrow" d="M1180 240 L1180 320" marker-end="url(#arrowHead)" />
+
+  <path class="arrow" d="M480 365 L520 365" marker-end="url(#arrowHead)" />
+  <path class="arrow" d="M880 365 L920 365" marker-end="url(#arrowHead)" />
+
+  <path class="arrow" d="M700 474 L700 560" marker-end="url(#arrowHead)" />
+  <path class="arrow" d="M480 605 L520 605" marker-end="url(#arrowHead)" />
+
+  <path class="arrow" d="M320 650 L320 760" marker-end="url(#arrowHead)" />
+  <path class="arrow" d="M700 650 L700 760" marker-end="url(#arrowHead)" />
+
+  <!-- Decision arrows -->
+  <path class="arrow" d="M660 840 L730 840" marker-end="url(#arrowHead)" />
+  <text class="note" x="680" y="828">yes</text>
+
+  <path class="arrow" d="M1090 805 L1130 805" marker-end="url(#arrowHead)" />
+
+  <path class="arrowSoft" d="M590 910 L730 910" marker-end="url(#arrowHeadSoft)" />
+  <text class="note" x="620" y="898">no / timeout</text>
+
+  <path class="arrow" d="M1285 850 L1285 860" marker-end="url(#arrowHead)" />
+
+  <!-- Footnote -->
+  <text class="note" x="80" y="930">Tip: import this SVG into Figma (File → Import) to edit the diagram. Mermaid source: docs/ripplit-user-flow.mmd</text>
+</svg>

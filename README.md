@@ -135,6 +135,11 @@ uvicorn app.main:app --reload --env-file .env
 
 Open `http://127.0.0.1:8000/` to view the hosted checkout.
 
+### Real-time FX widget
+
+The wallet UI includes a real-time FX converter (USD/EUR/SGD) with animated updates.
+Rates are fetched from `https://api.coinbase.com/v2/exchange-rates?currency=XRP` and refresh every 30 seconds.
+
 ### Marketplace demo (optional)
 
 Run the merchant storefront in a second terminal:

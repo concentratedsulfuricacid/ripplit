@@ -1,0 +1,43 @@
+flowchart LR
+  %% Ripplit user flow (import into Figma via Mermaid plugin, or export to SVG)
+
+  subgraph Merchant["Merchant site (marketplace/)"]
+    A["Shop + cart"] --> B["Checkout"]
+    B --> C["POST /api/order/create"]
+    C --> D["Redirect to Ripplit<br/>/static/marketplace.html?<br/>merchant, order_id, product_id, quantity,<br/>return_url, api_key"]
+  end
+
+  subgraph Checkout["Ripplit hosted checkout (static/marketplace.html)"]
+    D --> E["Buyer selects co-payers by handle<br/>(e.g. alice + bob + chen)"]
+    E --> F["Create GroupPay request<br/>POST /api/orders<br/>(X-API-Key)"]
+    F --> G["Request status: FUNDING"]
+    G --> H["Buyer pays share<br/>POST /api/requests/REQUEST_ID/pay"]
+    G --> I["Open co-payer links<br/>/static/copayer.html?request_id&handle"]
+  end
+
+  subgraph Copayers["Co-payers (static/copayer.html)"]
+    I --> J["Bob agrees & pays<br/>POST /api/requests/REQUEST_ID/pay"]
+    I --> K["Chen agrees & pays<br/>POST /api/requests/REQUEST_ID/pay"]
+  end
+
+  subgraph XRPL["XRPL Testnet"]
+    H --> L["EscrowCreate (alice)"]
+    J --> M["EscrowCreate (bob)"]
+    K --> N["EscrowCreate (chen)"]
+    O["EscrowFinish x3<br/>(fulfillment required if Condition set)"]
+    P["EscrowCancel (after deadline)"]
+  end
+
+  subgraph API["Ripplit backend (FastAPI)"]
+    F --> S["Create order + request<br/>terms_hash + deadline<br/>Condition + fulfillment (optional)"]
+    H --> T["Record escrow refs (owner + offer_sequence)"]
+    J --> T
+    K --> T
+    T --> U{"All participants ESCROWED?"}
+    U -- "yes + AUTO_FINISH=true" --> V["Submit EscrowFinish x3"]
+    V --> O
+    O --> W["Order status: PAID"]
+    W --> X["Callback POST return_url<br/>(order_id, status, details)"]
+    U -- "deadline reached / missing payer" --> Y["Order status: EXPIRED"]
+    Y --> P
+  end

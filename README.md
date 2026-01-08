@@ -22,10 +22,10 @@ Key ideas:
 
 1. A merchant storefront (optional) creates a cart order and redirects to the hosted checkout.
 2. The hosted checkout (`static/marketplace.html`) creates a GroupPay request via `POST /api/orders`.
-3. Each participant pays their share via `POST /api/requests/{id}/pay` which submits an XRPL `EscrowCreate`.
+3. Each participant pays their share via `POST /api/requests/REQUEST_ID/pay` which submits an XRPL `EscrowCreate`.
 4. When all participants are `ESCROWED`, the backend either:
    - auto-finishes the escrows (`AUTO_FINISH=true`), or
-   - waits for a manual `POST /api/requests/{id}/finish`.
+   - waits for a manual `POST /api/requests/REQUEST_ID/finish`.
 
 Status progression: `PENDING → FUNDING → READY → PAID` (or `EXPIRED`).
 
@@ -53,13 +53,13 @@ flowchart LR
     D --> E["Buyer selects co-payers by handle<br/>(e.g. alice + bob + chen)"]
     E --> F["Create GroupPay request<br/>POST /api/orders<br/>(X-API-Key)"]
     F --> G["Request status: FUNDING"]
-    G --> H["Buyer pays share<br/>POST /api/requests/{id}/pay"]
+    G --> H["Buyer pays share<br/>POST /api/requests/REQUEST_ID/pay"]
     G --> I["Open co-payer links<br/>/static/copayer.html?request_id&handle"]
   end
 
   subgraph Copayers["Co-payers (static/copayer.html)"]
-    I --> J["Bob agrees & pays<br/>POST /api/requests/{id}/pay"]
-    I --> K["Chen agrees & pays<br/>POST /api/requests/{id}/pay"]
+    I --> J["Bob agrees & pays<br/>POST /api/requests/REQUEST_ID/pay"]
+    I --> K["Chen agrees & pays<br/>POST /api/requests/REQUEST_ID/pay"]
   end
 
   subgraph XRPL["XRPL Testnet"]
@@ -104,20 +104,20 @@ flowchart LR
   R[Open /static/marketplace.html] --> C[Select co-payers by handle]
   C --> O[POST /api/orders]
   O --> F[Status: FUNDING]
-  F --> A[POST /api/requests/{id}/pay (buyer)]
+  F --> A["POST /api/requests/REQUEST_ID/pay (buyer)"]
   F --> L[Open /static/copayer.html?request_id&handle]
-  L --> B[POST /api/requests/{id}/pay (bob)]
-  L --> H[POST /api/requests/{id}/pay (chen)]
+  L --> B["POST /api/requests/REQUEST_ID/pay (bob)"]
+  L --> H["POST /api/requests/REQUEST_ID/pay (chen)"]
 ```
 
 ### Mermaid (XRPL escrow + auto-finish)
 
 ```mermaid
 flowchart LR
-  EC1[EscrowCreate (alice)] --> Q{All ESCROWED?}
-  EC2[EscrowCreate (bob)] --> Q
-  EC3[EscrowCreate (chen)] --> Q
-  Q -- yes + AUTO_FINISH=true --> EF[EscrowFinish x3 (fulfillment if Condition set)]
+  EC1["EscrowCreate (alice)"] --> Q{"All ESCROWED?"}
+  EC2["EscrowCreate (bob)"] --> Q
+  EC3["EscrowCreate (chen)"] --> Q
+  Q -- yes + AUTO_FINISH=true --> EF["EscrowFinish x3 (fulfillment if Condition set)"]
   EF --> PAID[Order: PAID]
   PAID --> CB[POST return_url callback]
   Q -- no + deadline passes --> EXP[Order: EXPIRED]

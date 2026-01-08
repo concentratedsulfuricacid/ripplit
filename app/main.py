@@ -74,7 +74,7 @@ async def pay_redirect(
     return_url: Optional[str] = None,
     api_key: Optional[str] = None,
 ) -> RedirectResponse:
-    url = f"/static/wallet.html?request_id={request_id}&handle={handle}"
+    url = f"/static/marketplace.html?request_id={request_id}&payer={handle}&handle={handle}"
     if return_url:
         url += f"&return_url={return_url}"
     if api_key:
@@ -101,6 +101,18 @@ async def list_products():
 @app.get("/api/contacts")
 async def list_contacts():
     return registry.list_contacts()
+
+
+@app.get("/api/wallet/balance/{handle}")
+async def wallet_balance(handle: str):
+    contact = registry.get_contact(handle)
+    if not contact:
+        raise HTTPException(status_code=404, detail="Unknown handle")
+    try:
+        balance_xrp = xrpl_service.get_balance_xrp(contact.address)
+    except XrplServiceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"handle": handle, "address": contact.address, "balance_xrp": balance_xrp}
 
 
 @app.post("/api/did/register")

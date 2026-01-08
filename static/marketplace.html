@@ -2,680 +2,488 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>GroupPay Checkout</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Ripplit</title>
   <style>
-    @import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Space+Grotesk:wght@400;500;600;700&display=swap");
-
-    :root {
-      --bg: #f3f0ea;
-      --ink: #1a1a1a;
-      --accent: #1f6f65;
-      --accent-dark: #165148;
-      --gold: #f1c66d;
-      --rose: #f7b6b0;
-      --card: #ffffff;
-      --shadow: 0 24px 45px rgba(19, 19, 19, 0.12);
+    :root{
+      --bg:#f6f8ff;
+      --card:#ffffff;
+      --text:#0f172a;
+      --muted:#64748b;
+      --border:rgba(15,23,42,.12);
+      --shadow:0 14px 40px rgba(15,23,42,.10);
+      --r:18px;
+      --accent:#2563eb;
+      --accent2:#16a34a;
+      --warn:#f59e0b;
+      --danger:#ef4444;
     }
-
-    * {
-      box-sizing: border-box;
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background: radial-gradient(900px 500px at 20% 0%, rgba(37,99,235,.12), transparent 55%),
+                  radial-gradient(900px 500px at 80% 10%, rgba(22,163,74,.10), transparent 50%),
+                  var(--bg);
+      color:var(--text);
     }
-
-    body {
-      margin: 0;
-      font-family: "Space Grotesk", sans-serif;
-      color: var(--ink);
-      background: radial-gradient(circle at 15% 0%, #fff7e5 0%, var(--bg) 45%, #efe5d8 100%);
-      min-height: 100vh;
+    .wrap{max-width:1050px; margin:0 auto; padding:22px 16px 70px}
+    header{
+      display:flex; justify-content:space-between; align-items:center; gap:12px;
+      margin-bottom:14px;
     }
-
-    .glow {
-      position: fixed;
-      inset: -20% 60% auto auto;
-      width: 340px;
-      height: 340px;
-      background: radial-gradient(circle, rgba(31, 111, 101, 0.2), transparent 70%);
-      filter: blur(4px);
-      z-index: -1;
-    }
-
-    header {
-      padding: 28px 8vw 12px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .brand-mark {
-      width: 44px;
-      height: 44px;
-      border-radius: 14px;
-      background: linear-gradient(135deg, var(--accent), #2e8a7b);
-      box-shadow: 0 12px 25px rgba(31, 111, 101, 0.35);
-    }
-
-    header h1 {
-      margin: 0;
-      font-family: "Fraunces", serif;
-      font-size: 30px;
-    }
-
-    .mode {
-      font-size: 13px;
-      background: #fff1d8;
-      padding: 6px 12px;
-      border-radius: 999px;
-      border: 1px solid #f0d2a3;
-    }
-
-    main {
-      padding: 0 8vw 60px;
-      display: grid;
-      gap: 24px;
-    }
-
-    .banner {
-      display: grid;
-      gap: 18px;
-      background: var(--card);
-      border-radius: 24px;
-      padding: 26px;
+    .brand{display:flex; align-items:center; gap:12px}
+    .logo{
+      width:42px; height:42px; border-radius:16px;
+      background: linear-gradient(135deg, rgba(37,99,235,.95), rgba(22,163,74,.85));
       box-shadow: var(--shadow);
-      border: 1px solid rgba(0, 0, 0, 0.06);
     }
-
-    .tag {
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.18em;
-      color: #6c5742;
-      background: #fff3df;
-      padding: 6px 12px;
-      border-radius: 999px;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      width: fit-content;
-    }
-
-    .banner h2 {
-      margin: 0;
-      font-size: 26px;
-      font-family: "Fraunces", serif;
-    }
-
-    .banner p {
-      margin: 0;
-      color: #4a4a4a;
-      max-width: 560px;
-    }
-
-    .banner-meta {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 12px;
-    }
-
-    .meta-card {
-      background: #f7f3ec;
-      border-radius: 16px;
-      padding: 12px 14px;
-      border: 1px solid rgba(0, 0, 0, 0.05);
-    }
-
-    .meta-card span {
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: #6d5b4b;
-    }
-
-    .meta-card strong {
-      display: block;
-      margin-top: 6px;
-      font-size: 16px;
-    }
-
-    .return-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--rose);
-      color: #1b1b1b;
-      padding: 10px 16px;
-      border-radius: 999px;
-      text-decoration: none;
-      font-weight: 600;
-      width: fit-content;
-    }
-
-    .grid {
-      display: grid;
-      gap: 24px;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    }
-
-    .panel {
-      background: var(--card);
-      border-radius: 22px;
-      padding: 22px;
+    h1{margin:0; font-size:18px}
+    .sub{color:var(--muted); font-size:13px; margin-top:2px}
+    .grid{display:grid; grid-template-columns: 1fr .95fr; gap:14px; margin-top:12px}
+    @media (max-width: 900px){ .grid{grid-template-columns:1fr;} }
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius: var(--r);
       box-shadow: var(--shadow);
-      border: 1px solid rgba(0, 0, 0, 0.05);
+      overflow:hidden;
     }
-
-    .panel h3 {
-      margin: 0 0 16px;
-      font-size: 18px;
+    .cardHeader{
+      padding:14px 16px;
+      border-bottom:1px solid var(--border);
+      display:flex; justify-content:space-between; align-items:center; gap:12px;
     }
-
-    .product-card {
-      border-radius: 16px;
-      padding: 14px;
-      border: 1px solid rgba(0, 0, 0, 0.08);
-      margin-bottom: 12px;
-      display: grid;
-      gap: 10px;
-      background: #faf7f2;
+    .cardBody{padding:16px}
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:7px 10px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      color:var(--muted);
+      background: #f8fafc;
+      font-size:12px;
+      white-space:nowrap;
     }
-
-    .product-card button {
-      justify-self: start;
+    .balance{
+      font-size:30px;
+      font-weight:900;
+      letter-spacing:-.02em;
     }
-
-    .product-card.locked button {
-      background: #d7d2c8;
-      cursor: not-allowed;
-    }
-
-    .contact-list {
-      display: grid;
-      gap: 10px;
-    }
-
-    .contact-card {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px 12px;
+    .muted{color:var(--muted)}
+    .row{display:flex; justify-content:space-between; gap:12px; align-items:center}
+    .btnRow{display:flex; gap:10px; flex-wrap:wrap}
+    button{
+      border:0;
+      cursor:pointer;
       border-radius: 14px;
-      background: #f6f8f7;
-      border: 1px solid rgba(0, 0, 0, 0.05);
+      padding:10px 12px;
+      font-weight:800;
+      transition: transform .04s ease, opacity .15s ease;
     }
-
-    button {
-      border: none;
-      background: var(--accent);
-      color: white;
-      padding: 10px 18px;
-      border-radius: 999px;
-      cursor: pointer;
-      font-weight: 600;
-      transition: background 0.2s ease, transform 0.2s ease;
+    button:active{transform: translateY(1px)}
+    .btn{background:#f1f5f9; color:var(--text); border:1px solid var(--border)}
+    .btnPrimary{background: linear-gradient(135deg, rgba(37,99,235,.95), rgba(37,99,235,.75)); color:white;}
+    .btnGood{background: linear-gradient(135deg, rgba(22,163,74,.95), rgba(22,163,74,.75)); color:white;}
+    .btnGhost{background:transparent; border:1px solid var(--border); color:var(--muted)}
+    .tag{
+      font-size:12px;
+      padding:5px 10px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:#f8fafc;
+      color:var(--muted);
     }
-
-    button:hover {
-      background: var(--accent-dark);
-      transform: translateY(-1px);
+    .statusP{background: rgba(245,158,11,.10); border-color: rgba(245,158,11,.25); color:#8a5a00;}
+    .statusF{background: rgba(22,163,74,.10); border-color: rgba(22,163,74,.25); color:#0b5f2a;}
+    .statusE{background: rgba(239,68,68,.10); border-color: rgba(239,68,68,.25); color:#8a1010;}
+    .contact{
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 12px;
+      border:1px solid var(--border);
+      border-radius: 14px;
+      background:#ffffff;
+      margin-top:10px;
     }
-
-    button.secondary {
-      background: transparent;
-      color: var(--accent);
-      border: 1px solid var(--accent);
+    .contactLeft{display:flex; flex-direction:column; gap:2px}
+    .contactName{font-weight:900}
+    .contactDid{font-size:12px; color:var(--muted)}
+    input[type="checkbox"]{width:18px; height:18px}
+    .historyItem{
+      padding:12px;
+      border:1px solid var(--border);
+      border-radius: 14px;
+      background:#ffffff;
+      display:flex; justify-content:space-between; align-items:flex-start; gap:10px;
+      margin-bottom:10px;
     }
-
-    .status {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12px;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: #f6f6f6;
-      border: 1px solid rgba(0, 0, 0, 0.08);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-
-    .status.paid {
-      background: #e6f5ec;
-      border-color: #b8e2c6;
-      color: #1b6b3a;
-    }
-
-    .status.funding {
-      background: #fff0d6;
-      border-color: #f3d7a7;
-      color: #915d18;
-    }
-
-    .status.expired {
-      background: #fde3e0;
-      border-color: #f4b9b1;
-      color: #9a2d2d;
-    }
-
-    .order-details {
-      display: grid;
-      gap: 12px;
-      font-size: 14px;
-    }
-
-    .pill {
-      background: #f3ede7;
-      padding: 6px 10px;
-      border-radius: 12px;
-      font-size: 12px;
-    }
-
-    .links {
-      display: grid;
-      gap: 6px;
-      font-size: 13px;
-    }
-
-    .links a {
-      color: var(--accent);
-      text-decoration: none;
-    }
-
-    .links a:hover {
-      text-decoration: underline;
-    }
-
-    .error {
-      color: #9a2d2d;
-      font-size: 13px;
-      min-height: 18px;
-    }
-
-    .quantity {
-      display: grid;
-      gap: 6px;
-      font-size: 13px;
-    }
-
-    .quantity input {
-      width: 120px;
-      padding: 6px 10px;
-      border-radius: 12px;
-      border: 1px solid rgba(0, 0, 0, 0.12);
-      font-family: inherit;
-    }
-
-    @media (max-width: 720px) {
-      header {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-    }
+    .hTitle{font-weight:950}
+    .hSmall{font-size:12px; color:var(--muted); margin-top:4px}
   </style>
 </head>
 <body>
-  <div class="glow"></div>
+<div class="wrap">
   <header>
     <div class="brand">
-      <div class="brand-mark"></div>
+      <div class="logo"></div>
       <div>
-        <h1>GroupPay Checkout</h1>
-        <div class="pill">Split payments settle on XRPL Testnet</div>
+        <h1>Ripplit Wallet</h1>
+        <div class="sub">GroupPay checkout</div>
       </div>
     </div>
-    <div class="mode" id="mode-pill">XRPL mode: ...</div>
+    <div class="btnRow">
+      <button class="btn" onclick="init()">Initialize Wallet</button>
+      <button class="btnGhost" onclick="refreshAll()">Refresh</button>
+    </div>
   </header>
 
-  <main>
-    <section class="banner">
-      <span class="tag">Redirected checkout</span>
-      <h2>You are paying <span id="merchant-name">Demo Merchant</span></h2>
-      <p id="merchant-message">Your payment is hosted by GroupPay. We will route funds to the merchant once everyone locks their share.</p>
-      <a id="return-link" class="return-link" href="#" style="display: none;">Return to merchant</a>
-      <div class="banner-meta">
-        <div class="meta-card">
-          <span>Order reference</span>
-          <strong id="merchant-order-id">Not provided</strong>
-        </div>
-        <div class="meta-card">
-          <span>Checkout total</span>
-          <strong id="merchant-total">Select an item</strong>
-        </div>
-        <div class="meta-card">
-          <span>Settlement method</span>
-          <strong>XRPL Escrow + GroupPay</strong>
-        </div>
+  <div class="grid">
+    <div class="card">
+      <div class="cardHeader">
+        <div style="font-weight:950">Your wallet</div>
+        <div class="pill">User: <b id="userPill">Alice</b></div>
       </div>
-    </section>
-
-    <section class="grid">
-      <div class="panel" id="order-panel">
-        <h3 id="catalog-title">Order summary (demo catalog)</h3>
-        <div id="product-list"></div>
-        <div class="quantity">
-          <label for="quantity">Quantity</label>
-          <input id="quantity" type="number" min="1" value="1" />
-        </div>
-      </div>
-      <div class="panel" id="checkout-panel">
-        <h3>Split your payment</h3>
-        <div class="order-details" id="cart-details">
-          <div>Select an item to start.</div>
-        </div>
-        <h4>Invite payers</h4>
-        <div class="contact-list" id="contact-list"></div>
-        <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
-          <button id="create-order">Create GroupPay Order</button>
-          <button class="secondary" id="clear-order">Reset</button>
-        </div>
-        <div class="error" id="error"></div>
-      </div>
-    </section>
-
-    <section class="panel" id="status-panel">
-      <h3>Live order status</h3>
-      <div class="order-details" id="order-details">
-        <div class="pill">No active order yet.</div>
-      </div>
-      <div class="links" id="payer-links"></div>
-    </section>
-  </main>
-
-  <script>
-    const params = new URLSearchParams(window.location.search);
-    const apiKey = params.get("api_key") || localStorage.getItem("apiKey") || "";
-    if (apiKey) {
-      localStorage.setItem("apiKey", apiKey);
-    }
-
-    function buildHeaders() {
-      const headers = { "Content-Type": "application/json" };
-      if (apiKey) {
-        headers["X-API-Key"] = apiKey;
-      }
-      return headers;
-    }
-
-    const state = {
-      products: [],
-      contacts: [],
-      selectedProduct: null,
-      participants: new Set(),
-      order: null,
-      request: null,
-      checkoutUrls: {},
-      poller: null,
-      quantity: 1,
-      merchantName: params.get("merchant") || "Demo Merchant",
-      merchantOrderId: params.get("order_id") || "Not provided",
-      returnUrl: params.get("return_url") || "",
-      lockedProductId: params.get("product_id"),
-      lockedQuantity: parseInt(params.get("quantity") || "1", 10),
-    };
-
-    const productList = document.getElementById("product-list");
-    const contactList = document.getElementById("contact-list");
-    const cartDetails = document.getElementById("cart-details");
-    const orderDetails = document.getElementById("order-details");
-    const payerLinks = document.getElementById("payer-links");
-    const errorEl = document.getElementById("error");
-    const modePill = document.getElementById("mode-pill");
-    const merchantNameEl = document.getElementById("merchant-name");
-    const merchantOrderIdEl = document.getElementById("merchant-order-id");
-    const merchantTotalEl = document.getElementById("merchant-total");
-    const returnLinkEl = document.getElementById("return-link");
-    const catalogTitleEl = document.getElementById("catalog-title");
-    const quantityInput = document.getElementById("quantity");
-
-    document.getElementById("create-order").addEventListener("click", createOrder);
-    document.getElementById("clear-order").addEventListener("click", resetState);
-    quantityInput.addEventListener("input", () => {
-      const value = parseInt(quantityInput.value || "1", 10);
-      state.quantity = Math.max(1, value || 1);
-      updateCart();
-    });
-
-    async function boot() {
-      merchantNameEl.textContent = state.merchantName;
-      merchantOrderIdEl.textContent = state.merchantOrderId;
-      if (state.returnUrl) {
-        returnLinkEl.href = state.returnUrl;
-        returnLinkEl.style.display = "inline-flex";
-      }
-      if (state.lockedProductId) {
-        catalogTitleEl.textContent = "Order summary";
-        state.quantity = state.lockedQuantity || 1;
-        quantityInput.value = state.quantity;
-        quantityInput.disabled = true;
-      }
-      await Promise.all([loadProducts(), loadContacts(), loadInfo()]);
-      if (state.lockedProductId) {
-        state.selectedProduct = state.products.find(
-          (product) => product.id === state.lockedProductId
-        );
-      }
-      renderProducts();
-      renderContacts();
-      updateCart();
-    }
-
-    async function loadInfo() {
-      const res = await fetch("/api/info");
-      const info = await res.json();
-      modePill.textContent = `XRPL mode: ${info.xrpl_mode}`;
-    }
-
-    async function loadProducts() {
-      const res = await fetch("/api/products");
-      state.products = await res.json();
-    }
-
-    async function loadContacts() {
-      const res = await fetch("/api/contacts");
-      state.contacts = await res.json();
-    }
-
-    function renderProducts() {
-      productList.innerHTML = "";
-      const products = state.lockedProductId
-        ? state.products.filter((product) => product.id === state.lockedProductId)
-        : state.products;
-
-      products.forEach((product) => {
-        const card = document.createElement("div");
-        const isLocked = !!state.lockedProductId;
-        card.className = `product-card${isLocked ? " locked" : ""}`;
-        card.innerHTML = `
+      <div class="cardBody">
+        <div class="row">
           <div>
-            <strong>${product.name}</strong>
-            <div>${product.description}</div>
+            <div class="muted" style="font-size:13px">Balance</div>
+            <div class="balance" id="bal">--</div>
           </div>
-          <div><strong>${product.price_xrp.toFixed(2)} XRP</strong></div>
-          <button ${isLocked ? "disabled" : ""} data-id="${product.id}">
-            ${state.selectedProduct?.id === product.id ? "Selected" : "Choose item"}
-          </button>
-        `;
-        card.querySelector("button").addEventListener("click", () => {
-          if (isLocked) return;
-          state.selectedProduct = product;
-          updateCart();
-          renderProducts();
-        });
-        productList.appendChild(card);
-      });
-    }
+          <div class="pill" id="addrPill">Not connected</div>
+        </div>
 
-    function renderContacts() {
-      contactList.innerHTML = "";
-      state.contacts.forEach((contact) => {
-        const row = document.createElement("label");
-        row.className = "contact-card";
-        row.innerHTML = `
-          <span>@${contact.handle}</span>
-          <input type="checkbox" />
-        `;
-        const checkbox = row.querySelector("input");
-        checkbox.addEventListener("change", () => {
-          if (checkbox.checked) {
-            state.participants.add(contact.handle);
-          } else {
-            state.participants.delete(contact.handle);
-          }
-          updateCart();
-        });
-        contactList.appendChild(row);
-      });
-    }
+        <div style="height:12px"></div>
 
-    function updateCart() {
-      if (!state.selectedProduct) {
-        cartDetails.innerHTML = "<div>Select an item to start.</div>";
-        merchantTotalEl.textContent = "Select an item";
-        return;
-      }
-      const selected = Array.from(state.participants);
-      const total = state.selectedProduct.price_xrp * state.quantity;
-      const share = selected.length ? total / selected.length : 0;
-      merchantTotalEl.textContent = `${total.toFixed(2)} XRP`;
-      cartDetails.innerHTML = `
-        <div><strong>Item</strong>: ${state.selectedProduct.name}</div>
-        <div><strong>Quantity</strong>: ${state.quantity}</div>
-        <div><strong>Total</strong>: ${total.toFixed(2)} XRP</div>
-        <div><strong>Payers</strong>: ${selected.length ? selected.join(", ") : "None"}</div>
-        <div><strong>Share</strong>: ${selected.length ? share.toFixed(2) + " XRP each" : "-"}</div>
-      `;
-    }
+        <div class="card" style="box-shadow:none; border-radius:14px;">
+          <div class="cardHeader">
+            <div style="font-weight:950">Payment request</div>
+            <div class="tag" id="orderTag">No order</div>
+          </div>
+          <div class="cardBody">
+            <div class="muted" style="font-size:13px">Order</div>
+            <div style="font-weight:900" id="orderLine">--</div>
+            <div class="muted" style="font-size:13px; margin-top:6px">Total</div>
+            <div style="font-weight:950" id="totalLine">--</div>
 
-    async function createOrder() {
-      errorEl.textContent = "";
-      if (!state.selectedProduct) {
-        errorEl.textContent = "Select an item first.";
-        return;
-      }
-      const participants = Array.from(state.participants);
-      if (!participants.length) {
-        errorEl.textContent = "Select at least one payer.";
-        return;
-      }
+            <div style="height:10px"></div>
+
+            <div class="muted" style="font-size:13px">Choose co-payees</div>
+            <div class="contact">
+              <div class="contactLeft">
+                <div class="contactName" id="contactBobName">Bob</div>
+                <div class="contactDid" id="contactBobDid">did:ripplit:bob</div>
+              </div>
+              <input type="checkbox" id="cbBob" checked />
+            </div>
+            <div class="contact">
+              <div class="contactLeft">
+                <div class="contactName" id="contactChenName">Chen</div>
+                <div class="contactDid" id="contactChenDid">did:ripplit:chen</div>
+              </div>
+              <input type="checkbox" id="cbChen" checked />
+            </div>
+
+            <div style="height:12px"></div>
+
+            <div class="row">
+              <div>
+                <div class="muted" style="font-size:13px">Your share</div>
+                <div style="font-weight:950" id="shareLine">--</div>
+              </div>
+              <button class="btnGood" onclick="proceed()" id="proceedBtn" disabled>Proceed with Payment</button>
+            </div>
+
+            <div class="muted" style="font-size:12px; margin-top:10px" id="hint">
+              Initialize wallet first.
+            </div>
+
+            <div style="height:10px"></div>
+
+            <div class="btnRow">
+              <button class="btn" onclick="openCopayer('bob')">Open Bob wallet</button>
+              <button class="btn" onclick="openCopayer('chen')">Open Chen wallet</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="cardHeader">
+        <div style="font-weight:950">Transaction history</div>
+        <button class="btnGhost" onclick="loadHistory()">Refresh</button>
+      </div>
+      <div class="cardBody">
+        <div id="history"></div>
+        <div class="muted" id="emptyHist">No transactions yet.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const qs = new URLSearchParams(window.location.search);
+const apiBase = (qs.get("api_base") || window.location.origin).replace(/\/$/, "");
+const apiKey = qs.get("api_key") || "";
+let order_id = qs.get("order_id") || "";
+const product_id = qs.get("product_id") || "";
+const quantity = Math.max(parseInt(qs.get("quantity") || "1", 10), 1);
+let total_xrp = parseFloat(qs.get("total_xrp") || "0");
+const return_url = qs.get("return_url") || "";
+const payer = qs.get("payer") || qs.get("handle") || "alice";
+let request_id = qs.get("request_id") || "";
+
+let inited = false;
+let lastRequestId = null;
+let contacts = [];
+let product = null;
+
+function fmtX(x){ return `${x.toFixed(2)} XRP`; }
+
+function headersJson(){
+  const headers = {"Content-Type":"application/json"};
+  if (apiKey) headers["X-API-Key"] = apiKey;
+  return headers;
+}
+
+async function apiFetch(path, options = {}) {
+  const response = await fetch(`${apiBase}${path}`, options);
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Request failed: ${response.status}`);
+  }
+  return response.json();
+}
+
+function updateUserPill() {
+  const pretty = payer.charAt(0).toUpperCase() + payer.slice(1);
+  document.getElementById("userPill").textContent = pretty;
+}
+
+function calcShare() {
+  let n = 1;
+  if(document.getElementById("cbBob").checked) n++;
+  if(document.getElementById("cbChen").checked) n++;
+  return n ? (total_xrp / n) : total_xrp;
+}
+
+function setOrderInfo(){
+  const tag = document.getElementById("orderTag");
+  const orderLine = document.getElementById("orderLine");
+  const totalLine = document.getElementById("totalLine");
+  const shareLine = document.getElementById("shareLine");
+
+  if(order_id){
+    tag.textContent = order_id;
+    orderLine.textContent = order_id;
+    totalLine.textContent = fmtX(total_xrp);
+    shareLine.textContent = fmtX(calcShare());
+  } else if (product_id){
+    tag.textContent = "Pending";
+    orderLine.textContent = product ? product.name : product_id;
+    totalLine.textContent = total_xrp ? fmtX(total_xrp) : "--";
+    shareLine.textContent = total_xrp ? fmtX(calcShare()) : "--";
+  } else {
+    tag.textContent = "No order";
+    orderLine.textContent = "Open via marketplace redirect";
+    totalLine.textContent = "--";
+    shareLine.textContent = "--";
+  }
+}
+
+document.getElementById("cbBob").addEventListener("change", () => {
+  document.getElementById("shareLine").textContent = fmtX(calcShare());
+});
+document.getElementById("cbChen").addEventListener("change", () => {
+  document.getElementById("shareLine").textContent = fmtX(calcShare());
+});
+
+async function loadContacts(){
+  try {
+    contacts = await apiFetch("/api/contacts");
+  } catch (err) {
+    contacts = [];
+  }
+  const byHandle = {};
+  contacts.forEach((c) => byHandle[c.handle] = c);
+  const bob = byHandle.bob;
+  const chen = byHandle.chen;
+  if (bob) {
+    document.getElementById("contactBobName").textContent = bob.handle.charAt(0).toUpperCase() + bob.handle.slice(1);
+    document.getElementById("contactBobDid").textContent = bob.address;
+  }
+  if (chen) {
+    document.getElementById("contactChenName").textContent = chen.handle.charAt(0).toUpperCase() + chen.handle.slice(1);
+    document.getElementById("contactChenDid").textContent = chen.address;
+  }
+  const me = byHandle[payer];
+  if (me) {
+    document.getElementById("addrPill").textContent = `${me.address.slice(0,6)}...${me.address.slice(-6)}`;
+  } else {
+    document.getElementById("addrPill").textContent = "Connected";
+  }
+}
+
+async function loadProduct(){
+  try {
+    const list = await apiFetch("/api/products");
+    product = list.find((item) => item.id === product_id) || list[0] || null;
+    if (!total_xrp && product) {
+      total_xrp = product.price_xrp * quantity;
+    }
+  } catch (err) {
+    product = null;
+  }
+}
+
+async function refreshRequest(){
+  if (!request_id) return;
+  try {
+    const req = await apiFetch(`/api/requests/${request_id}`);
+    if (req.order_id) {
+      order_id = req.order_id;
+    }
+    lastRequestId = req.id || request_id;
+    const me = req.participants.find((p) => p.handle === payer);
+    if (me) {
+      document.getElementById("hint").textContent = `Your status: ${me.status}`;
+    }
+  } catch (err) {
+    document.getElementById("hint").textContent = "Unable to refresh request.";
+  }
+}
+
+async function init(){
+  inited = true;
+  document.getElementById("hint").textContent = "Ready.";
+  await loadProduct();
+  await loadContacts();
+  await refreshBalance();
+  await refreshRequest();
+  await loadHistory();
+  setOrderInfo();
+  document.getElementById("proceedBtn").disabled = !(inited && (product_id || order_id));
+}
+
+async function refreshBalance(){
+  try {
+    const data = await apiFetch(`/api/wallet/balance/${payer}`);
+    document.getElementById("bal").textContent = fmtX(data.balance_xrp || 0);
+    if (data.address) {
+      document.getElementById("addrPill").textContent = `${data.address.slice(0,6)}...${data.address.slice(-6)}`;
+    }
+  } catch (err) {
+    document.getElementById("bal").textContent = "--";
+    document.getElementById("addrPill").textContent = "Unavailable";
+  }
+}
+
+async function proceed(){
+  if(!inited) return alert("Initialize wallet first.");
+  const selected = ["bob", "chen"].filter((h) => document.getElementById(`cb${h.charAt(0).toUpperCase()}${h.slice(1)}`).checked);
+  const participants = [payer, ...selected];
+
+  document.getElementById("proceedBtn").disabled = true;
+  document.getElementById("hint").textContent = request_id ? "Paying your share..." : "Creating request and paying your share...";
+
+  try {
+    if (!request_id) {
+      if (!product_id) throw new Error("Missing product id.");
       const payload = {
-        product_id: state.selectedProduct.id,
-        quantity: state.quantity,
-        payment_method: "group_pay",
+        product_id,
+        quantity,
         participants,
         split: "equal",
         deadline_minutes: 15,
-        return_url: state.returnUrl || window.location.href,
+        return_url: return_url || null,
       };
-      const res = await fetch("/api/orders", {
+      const response = await apiFetch("/api/orders", {
         method: "POST",
-        headers: buildHeaders(),
-        body: JSON.stringify(payload),
+        headers: headersJson(),
+        body: JSON.stringify(payload)
       });
-      if (!res.ok) {
-        const err = await res.json();
-        errorEl.textContent = err.detail || "Failed to create order.";
-        return;
-      }
-      const data = await res.json();
-      state.order = data.order;
-      state.request = data.group_request;
-      state.checkoutUrls = data.checkout_urls || {};
-      renderOrder();
-      startPolling();
+      order_id = response.order.id;
+      request_id = response.group_request.id;
+      lastRequestId = request_id;
+      setOrderInfo();
     }
 
-    function renderOrder() {
-      if (!state.order || !state.request) {
-        orderDetails.innerHTML = "<div class=\"pill\">No active order yet.</div>";
-        payerLinks.innerHTML = "";
-        return;
-      }
-      const statusClass = statusClassName(state.request.status);
-      orderDetails.innerHTML = `
-        <div><span class="status ${statusClass}">${state.request.status}</span></div>
-        <div><strong>Order ID</strong>: ${state.order.id}</div>
-        <div><strong>Group Request</strong>: ${state.request.id}</div>
-        <div><strong>Deadline</strong>: ${new Date(state.request.deadline).toLocaleString()}</div>
-        <div><strong>Terms Hash</strong>: ${state.request.terms_hash.slice(0, 10)}...</div>
-      `;
-      payerLinks.innerHTML = "<strong>Payer links</strong>";
-      const checkoutHeader = document.createElement("div");
-      checkoutHeader.style.marginTop = "8px";
-      checkoutHeader.innerHTML = "<strong>Shareable checkout links</strong>";
-      payerLinks.appendChild(checkoutHeader);
-      state.request.participants.forEach((participant) => {
-        const link = document.createElement("a");
-        const url = new URL("/static/wallet.html", window.location.origin);
-        url.searchParams.set("handle", participant.handle);
-        url.searchParams.set("request_id", state.request.id);
-        if (state.returnUrl) {
-          url.searchParams.set("return_url", state.returnUrl);
-        }
-        if (apiKey) {
-          url.searchParams.set("api_key", apiKey);
-        }
-        link.href = url.toString();
-        link.textContent = `@${participant.handle} wallet`;
-        link.target = "_blank";
-        payerLinks.appendChild(link);
+    await apiFetch(`/api/requests/${request_id}/pay`, {
+      method: "POST",
+      headers: headersJson(),
+      body: JSON.stringify({ handle: payer })
+    });
 
-        const checkoutLink = document.createElement("a");
-        const checkoutBase = state.checkoutUrls[participant.handle] || link.href;
-        const checkoutUrl = new URL(checkoutBase, window.location.origin);
-        if (apiKey && !checkoutUrl.searchParams.has("api_key")) {
-          checkoutUrl.searchParams.set("api_key", apiKey);
-        }
-        checkoutLink.href = checkoutUrl.toString();
-        checkoutLink.textContent = `Pay as @${participant.handle} (redirect)`;
-        checkoutLink.target = "_blank";
-        payerLinks.appendChild(checkoutLink);
-      });
-    }
+    document.getElementById("hint").textContent = "Escrow submitted. Waiting for others.";
+  } catch (err) {
+    document.getElementById("hint").textContent = `Failed: ${err.message}`;
+  }
 
-    function statusClassName(status) {
-      if (status === "PAID") return "paid";
-      if (status === "EXPIRED") return "expired";
-      return "funding";
-    }
+  await refreshRequest();
+  await loadHistory();
+  document.getElementById("proceedBtn").disabled = false;
+}
 
-    function startPolling() {
-      if (state.poller) {
-        clearInterval(state.poller);
-      }
-      state.poller = setInterval(async () => {
-        if (!state.request) return;
-        const res = await fetch(`/api/requests/${state.request.id}`);
-        if (res.ok) {
-          state.request = await res.json();
-          renderOrder();
-        }
-      }, 4000);
-    }
+function statusChip(s){
+  if(s === "PAID") return `<span class="tag statusF">Paid</span>`;
+  if(s === "EXPIRED") return `<span class="tag statusE">Expired</span>`;
+  return `<span class="tag statusP">${s || "Pending"}</span>`;
+}
 
-    function resetState() {
-      state.selectedProduct = null;
-      state.participants.clear();
-      state.order = null;
-      state.request = null;
-      state.checkoutUrls = {};
-      errorEl.textContent = "";
-      if (state.poller) {
-        clearInterval(state.poller);
-        state.poller = null;
-      }
-      renderProducts();
-      renderContacts();
-      updateCart();
-      renderOrder();
-    }
+async function loadHistory(){
+  let list = [];
+  try {
+    const data = await apiFetch("/api/orders");
+    list = Array.isArray(data) ? data : (data.orders || []);
+  } catch (err) {
+    list = [];
+  }
+  const el = document.getElementById("history");
+  const empty = document.getElementById("emptyHist");
 
-    boot();
-  </script>
+  if(list.length === 0){
+    el.innerHTML = "";
+    empty.style.display = "block";
+    return;
+  }
+  empty.style.display = "none";
+  el.innerHTML = list.map(h => `
+    <div class="historyItem">
+      <div>
+        <div class="hTitle">${h.id}</div>
+        <div class="hSmall">Total ${fmtX(h.total_xrp || 0)}</div>
+      </div>
+      <div>${statusChip(h.status)}</div>
+    </div>
+  `).join("");
+}
+
+function openCopayer(user){
+  if (!request_id) {
+    alert("Create the request first.");
+    return;
+  }
+  const url = new URL("/static/copayer.html", window.location.origin);
+  url.searchParams.set("request_id", request_id);
+  url.searchParams.set("handle", user);
+  url.searchParams.set("api_base", apiBase);
+  if (apiKey) url.searchParams.set("api_key", apiKey);
+  if (return_url) url.searchParams.set("return_url", return_url);
+  window.open(url.toString(), "_blank");
+}
+
+async function refreshAll(){
+  updateUserPill();
+  setOrderInfo();
+  await refreshBalance();
+  await refreshRequest();
+  await loadHistory();
+  document.getElementById("proceedBtn").disabled = !(inited && (product_id || order_id));
+}
+
+updateUserPill();
+init();
+</script>
 </body>
 </html>

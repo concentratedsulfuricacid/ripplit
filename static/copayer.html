@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Ripplit Co-payer</title>
+  <style>
+    :root{ --bg:#f6f8ff; --card:#fff; --text:#0f172a; --muted:#64748b; --border:rgba(15,23,42,.12);
+      --shadow:0 14px 40px rgba(15,23,42,.10); --r:18px; --accent:#2563eb; --good:#16a34a; }
+    *{box-sizing:border-box}
+    body{ margin:0; font-family: ui-sans-serif, system-ui; background:var(--bg); color:var(--text); }
+    .wrap{max-width:850px; margin:0 auto; padding:22px 16px 70px}
+    .card{ background:var(--card); border:1px solid var(--border); border-radius:var(--r); box-shadow:var(--shadow); overflow:hidden; }
+    .cardHeader{ padding:14px 16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+    .cardBody{ padding:16px; }
+    .pill{ padding:7px 10px; border-radius:999px; border:1px solid var(--border); color:var(--muted); background:#f8fafc; font-size:12px; }
+    .balance{ font-size:28px; font-weight:900; }
+    .muted{ color:var(--muted); }
+    .req{ padding:12px; border:1px solid var(--border); border-radius:14px; background:#fff; margin-top:10px; display:flex; justify-content:space-between; gap:10px; }
+    .statusRow{ padding:10px 12px; border:1px solid var(--border); border-radius:14px; background:#fff; margin-top:8px; display:flex; justify-content:space-between; gap:10px; align-items:center; }
+    .statusBadge{ font-size:12px; padding:4px 8px; border-radius:999px; border:1px solid var(--border); color:var(--muted); background:#f8fafc; }
+    .statusGood{ background: rgba(22,163,74,.10); border-color: rgba(22,163,74,.25); color:#0b5f2a; }
+    .statusWarn{ background: rgba(245,158,11,.10); border-color: rgba(245,158,11,.25); color:#8a5a00; }
+    .statusBad{ background: rgba(239,68,68,.10); border-color: rgba(239,68,68,.25); color:#8a1010; }
+    button{ border:0; cursor:pointer; border-radius:14px; padding:10px 12px; font-weight:900; }
+    .btn{ background:#f1f5f9; border:1px solid var(--border); }
+    .btnGood{ background: linear-gradient(135deg, rgba(22,163,74,.95), rgba(22,163,74,.75)); color:white; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="cardHeader">
+      <div style="font-weight:950">Ripplit Wallet</div>
+      <div class="pill" id="userPill">—</div>
+    </div>
+    <div class="cardBody">
+      <div class="muted" style="font-size:13px">Balance</div>
+      <div class="balance" id="bal">—</div>
+      <div class="muted" style="font-size:12px" id="addr">—</div>
+
+      <div style="height:12px"></div>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap">
+        <button class="btn" onclick="refresh()">Refresh</button>
+      </div>
+
+      <div style="height:12px"></div>
+      <div class="muted" style="font-size:13px">Pending requests</div>
+      <div id="inbox"></div>
+      <div class="muted" id="empty">No pending requests.</div>
+
+      <div style="height:12px"></div>
+      <div class="muted" style="font-size:13px">Co-payees status</div>
+      <div id="statusList"></div>
+      <div class="muted" id="statusEmpty">Waiting for a request.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const qs = new URLSearchParams(window.location.search);
+const apiBase = (qs.get("api_base") || window.location.origin).replace(/\/$/, "");
+const apiKey = qs.get("api_key") || "";
+const user = qs.get("handle") || qs.get("user") || "bob";
+const requestId = qs.get("request_id") || "";
+
+const userPill = document.getElementById("userPill");
+const addr = document.getElementById("addr");
+const bal = document.getElementById("bal");
+const inbox = document.getElementById("inbox");
+const empty = document.getElementById("empty");
+const statusList = document.getElementById("statusList");
+const statusEmpty = document.getElementById("statusEmpty");
+
+userPill.textContent = user.toUpperCase();
+
+function fmtX(x){ return `${x.toFixed(2)} XRP`; }
+
+function headersJson(){
+  const headers = {"Content-Type":"application/json"};
+  if (apiKey) headers["X-API-Key"] = apiKey;
+  return headers;
+}
+
+async function apiFetch(path, options = {}) {
+  const response = await fetch(`${apiBase}${path}`, options);
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `Request failed: ${response.status}`);
+  }
+  return response.json();
+}
+
+async function refreshBalance(){
+  try {
+    const data = await apiFetch(`/api/wallet/balance/${user}`);
+    bal.textContent = fmtX(data.balance_xrp || 0);
+    addr.textContent = data.address || "Unknown handle";
+  } catch (err) {
+    bal.textContent = "—";
+    addr.textContent = "Unavailable";
+  }
+}
+
+function statusClass(status){
+  if (status === "FINISHED") return "statusGood";
+  if (status === "ESCROWED") return "statusWarn";
+  if (status === "REFUNDED") return "statusBad";
+  if (status === "UNPAID") return "statusWarn";
+  return "";
+}
+
+function renderStatusList(req){
+  if (!req) {
+    statusList.innerHTML = "";
+    statusEmpty.style.display = "block";
+    return;
+  }
+  statusEmpty.style.display = "none";
+  statusList.innerHTML = req.participants.map((p) => `
+    <div class="statusRow">
+      <div>
+        <div style="font-weight:900">@${p.handle}</div>
+        <div class="muted" style="font-size:12px">${fmtX(p.amount_xrp)}</div>
+      </div>
+      <span class="statusBadge ${statusClass(p.status)}">${p.status}</span>
+    </div>
+  `).join("");
+}
+
+function renderRequestCard(req, participant){
+  const share = participant ? fmtX(participant.amount_xrp) : "—";
+  const status = participant ? participant.status : "UNKNOWN";
+  const disabled = !participant || participant.status !== "UNPAID";
+  const buttonLabel = disabled ? status : "Agree & Pay";
+  return `
+    <div class="req">
+      <div>
+        <div style="font-weight:950">${req.order_id}</div>
+        <div class="muted" style="font-size:12px">Share: ${share}</div>
+        <div class="muted" style="font-size:12px">Status: ${status}</div>
+      </div>
+      <button class="btnGood" onclick="pay('${req.id}')" ${disabled ? "disabled" : ""}>${buttonLabel}</button>
+    </div>
+  `;
+}
+
+async function refreshInbox(){
+  if (!requestId) {
+    inbox.innerHTML = "";
+    empty.style.display = "block";
+    empty.textContent = "Open from the main checkout link.";
+    renderStatusList(null);
+    return;
+  }
+  try {
+    const req = await apiFetch(`/api/requests/${requestId}`);
+    const participant = req.participants.find((p) => p.handle === user);
+    inbox.innerHTML = renderRequestCard(req, participant);
+    empty.style.display = "none";
+    renderStatusList(req);
+  } catch (err) {
+    inbox.innerHTML = "";
+    empty.style.display = "block";
+    empty.textContent = "Unable to load request.";
+    renderStatusList(null);
+  }
+}
+
+async function pay(reqId){
+  try {
+    await apiFetch(`/api/requests/${reqId}/pay`, {
+      method:"POST",
+      headers: headersJson(),
+      body: JSON.stringify({ handle: user })
+    });
+  } catch (err) {
+    empty.textContent = `Payment failed: ${err.message}`;
+    empty.style.display = "block";
+  }
+  await refresh();
+}
+
+async function refresh(){
+  await refreshBalance();
+  await refreshInbox();
+}
+
+setInterval(refresh, 4000);
+refresh();
+</script>
+</body>
+</html>

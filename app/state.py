@@ -18,22 +18,22 @@ class StateStore:
     def _seed_products(self) -> None:
         catalog = [
             Product(
-                id="ticket",
-                name="Concert Ticket",
-                description="General admission + digital collectible stub.",
-                price_xrp=18.5,
+                id="RM-HEAD-01",
+                name="Demo Headphones",
+                description="GroupPay demo headphones.",
+                price_xrp=3.0,
             ),
             Product(
-                id="stay",
-                name="Airbnb Deposit",
-                description="Split a shared booking deposit with friends.",
-                price_xrp=42.0,
+                id="RM-KB-02",
+                name="Mechanical Keyboard (Mini)",
+                description="Compact keyboard for the demo store.",
+                price_xrp=4.5,
             ),
             Product(
-                id="dinner",
-                name="Dinner Voucher",
-                description="Prepay a tasting menu for the group.",
-                price_xrp=27.75,
+                id="RM-MUG-03",
+                name="Developer Mug",
+                description="Ceramic mug for late-night builds.",
+                price_xrp=1.8,
             ),
         ]
         self.products = {item.id: item for item in catalog}

@@ -64,6 +64,21 @@ class XrplService:
         with urllib.request.urlopen(req, timeout=10) as resp:
             return json.load(resp)
 
+    def get_balance_xrp(self, address: str) -> float:
+        if self.mode == "mock":
+            return 0.0
+        result = self._raw_request(
+            "account_info", {"account": address, "ledger_index": "validated"}
+        ).get("result", {})
+        account_data = result.get("account_data") or {}
+        drops = account_data.get("Balance")
+        if drops is None:
+            raise XrplServiceError("Balance unavailable for account")
+        try:
+            return round(int(drops) / 1_000_000, 6)
+        except (ValueError, TypeError) as exc:
+            raise XrplServiceError("Invalid balance data") from exc
+
     def generate_condition(self) -> Dict[str, str]:
         try:
             from cryptoconditions import PreimageSha256

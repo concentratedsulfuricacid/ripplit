@@ -10,10 +10,17 @@ class InitResponse(BaseModel):
 
 class StartFromRedirect(BaseModel):
     order_id: str
-    total_xrp: float
     return_url: str
-    item_label: Optional[str] = "Marketplace order"
-    selected_payees: List[User]  # e.g. ["bob","chen"]
+    item_label: str | None = None
+    selected_payees: list[str] = []
+
+    # NEW:
+    total_rlusd: float | None = None
+    currency: str | None = "XRP"
+
+    # LEGACY:
+    total_xrp: float | None = None
+
 
 class PayAction(BaseModel):
     payer: User

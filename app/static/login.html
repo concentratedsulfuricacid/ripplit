@@ -116,11 +116,13 @@ const qs = new URLSearchParams(window.location.search);
 const order_id = qs.get("order_id") || "";
 const total_xrp = qs.get("total_xrp") || "";
 const return_url = qs.get("return_url") || "";
+const total_rlusd = qs.get("total_rlusd") || "";
+const currency = qs.get("currency") || "RLUSD";
 
 function renderOrderBox(){
   const box = document.getElementById("orderBox");
   if(order_id){
-    box.innerHTML = `You were redirected for order <b>${order_id}</b><br/>Total: <b>${total_xrp} XRP</b>`;
+    box.innerHTML = `You were redirected for order <b>${order_id}</b><br/>Total: <b>${total_rlusd} ${currency}</b>`;
   } else {
     box.innerHTML = `No active checkout. You can still login to view your wallet.`;
   }
@@ -144,6 +146,8 @@ function login(){
   p.set("user", user);
   if(order_id) p.set("order_id", order_id);
   if(total_xrp) p.set("total_xrp", total_xrp);
+  if(total_rlusd) p.set("total_rlusd", total_rlusd);
+  if(currency) p.set("currency", currency);
   if(return_url) p.set("return_url", return_url);
 
   window.location.href = `/static/wallet.html?${p.toString()}`;

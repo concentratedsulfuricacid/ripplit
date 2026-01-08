@@ -46,8 +46,38 @@ def list_history():
     out.sort(key=lambda x: x["created_at_unix"], reverse=True)
     return out
 
+
+DEFAULT_RLUSD_TO_XRP = 0.50   # fallback: 1 RLUSD ~= 0.50 XRP
+QUOTE_BUFFER = 1.02          # +2% buffer to avoid underpay due to spread / movement
+
+
+def quote_rlusd_to_xrp(total_rlusd: float) -> Dict:
+    """
+    Returns:
+      {
+        "rate_xrp_per_rlusd": float,
+        "total_xrp": float,
+        "buffer": float,
+        "source": str
+      }
+    Replace this later with real AMM/orderbook quote logic.
+    """
+    rl = float(total_rlusd)
+
+    # TODO: Replace with real AMM quote (amm_info / book_offers).
+    rate = float(DEFAULT_RLUSD_TO_XRP)
+    total_xrp = rl * rate * QUOTE_BUFFER
+
+    return {
+        "rate_xrp_per_rlusd": rate,
+        "total_xrp": round(total_xrp, 6),
+        "buffer": QUOTE_BUFFER,
+        "source": "fallback_constant",
+    }
+
 def create_request_from_redirect(req: StartFromRedirect) -> Dict:
     ensure_inited()
+
     vault_address = STATE["coordinator"].classic_address
     merchant_address = STATE["merchant"].classic_address
 
@@ -57,28 +87,57 @@ def create_request_from_redirect(req: StartFromRedirect) -> Dict:
     if n < 2:
         raise ValueError("Select at least one co-payee (Bob or Chen).")
 
-    share = float(req.total_xrp) / n
-
-    merchant_address = STATE["merchant"].classic_address
     created_at = _now()
     expires_at = created_at + REQUEST_EXPIRES_S
-
     request_id = _id("tx")
 
+    # ---- Decide amounts: RLUSD (display) vs XRP (settlement via escrow) ----
+    currency = (getattr(req, "currency", None) or "XRP").upper()
+
+    total_rlusd: Optional[float] = None
+    quote_info: Optional[Dict] = None
+
+    if currency == "RLUSD":
+        # marketplace sends total_rlusd
+        if getattr(req, "total_rlusd", None) is None:
+            raise ValueError("Missing total_rlusd for RLUSD checkout.")
+        total_rlusd = float(req.total_rlusd)
+
+        # Quote how much XRP we need to escrow in total
+        quote_info = quote_rlusd_to_xrp(total_rlusd)
+        total_xrp = float(quote_info["total_xrp"])
+    else:
+        # legacy path: marketplace sends total_xrp directly
+        if getattr(req, "total_xrp", None) is None:
+            raise ValueError("Missing total_xrp for XRP checkout.")
+        total_xrp = float(req.total_xrp)
+
+    # Split by XRP value (escrows are in XRP)
+    share_xrp = total_xrp / n
+
+    # ---- Build participants ----
     participants: Dict[User, Dict] = {}
     for u in participants_users:
         did = f"did:ripplit:{u}"
         addr = resolve_did(did)
-        participants[u] = Participant(did=did, address=addr, share_xrp=share).model_dump()
+        participants[u] = Participant(did=did, address=addr, share_xrp=share_xrp).model_dump()
 
+    # ---- Store request ----
     request_obj = {
         "vault_address": vault_address,
         "request_id": request_id,
         "order_id": req.order_id,
         "item_label": req.item_label or "Marketplace order",
-        "total_xrp": float(req.total_xrp),
+
+        # settlement & display amounts
+        "total_xrp": float(total_xrp),
+        "currency": currency,
+        "total_rlusd": float(total_rlusd) if total_rlusd is not None else None,
+        "quote": quote_info,  # contains rate + buffer + source
+
         "return_url": req.return_url,
         "merchant_address": merchant_address,
+
         "created_at_unix": created_at,
         "expires_at_unix": expires_at,
         "status": "PENDING",
@@ -88,8 +147,9 @@ def create_request_from_redirect(req: StartFromRedirect) -> Dict:
 
     STATE["requests"][request_id] = request_obj
 
-    # Alice immediately pays her share
+    # Alice immediately pays her share (escrow create)
     _pay_internal(request_id, "alice")
+
     return STATE["requests"][request_id]
 
 def inbox_for(user: User):

@@ -249,16 +249,22 @@
   </div>
 
 <script>
+// const PRODUCTS = [
+//   { sku:"RM-HEAD-01", name:"Demo Headphones", price:3.00 },
+//   { sku:"RM-KB-02",   name:"Mechanical Keyboard (Mini)", price:4.50 },
+//   { sku:"RM-MUG-03",  name:"Developer Mug", price:1.80 }
+// ];
 const PRODUCTS = [
-  { sku:"RM-HEAD-01", name:"Demo Headphones", price:3.00 },
-  { sku:"RM-KB-02",   name:"Mechanical Keyboard (Mini)", price:4.50 },
-  { sku:"RM-MUG-03",  name:"Developer Mug", price:1.80 }
+  { sku:"RM-HEAD-01", name:"Demo Headphones", price_rlusd: 3.00 },
+  { sku:"RM-KB-02",   name:"Mechanical Keyboard (Mini)", price_rlusd: 4.50 },
+  { sku:"RM-MUG-03",  name:"Developer Mug", price_rlusd: 1.80 }
 ];
 
 const cart = new Map(); // sku -> qty
 let currentOrder = null; // {order, redirect_url}
 
-function money(x){ return `${x.toFixed(2)} XRP`; }
+// function money(x){ return `${x.toFixed(2)} XRP`; }
+function money(x){ return `${x.toFixed(2)} RLUSD`; }
 
 function badgeFor(status){
   const cls = status === "PAID" ? "paid" : status === "FAILED" ? "failed" : "pending";
@@ -271,7 +277,7 @@ function renderProducts(){
     <div class="p">
       <div class="pSku">${p.sku}</div>
       <div class="pName">${p.name}</div>
-      <div class="pPrice">${money(p.price)}</div>
+      <div class="pPrice">${money(p.price_rlusd)}</div>
       <div class="btnRow">
         <button class="btn" onclick="addToCart('${p.sku}')">Add</button>
         <button class="btnGhost" onclick="removeFromCart('${p.sku}')">Remove</button>
@@ -280,12 +286,20 @@ function renderProducts(){
   `).join("");
 }
 
+// function cartItems(){
+//   return [...cart.entries()].map(([sku, qty]) => {
+//     const p = PRODUCTS.find(x => x.sku === sku);
+//     return { sku, name: p.name, unit_price_xrp: p.price, qty };
+//   });
+// }
+
 function cartItems(){
   return [...cart.entries()].map(([sku, qty]) => {
     const p = PRODUCTS.find(x => x.sku === sku);
-    return { sku, name: p.name, unit_price_xrp: p.price, qty };
+    return { sku, name: p.name, unit_price_rlusd: p.price_rlusd, qty };
   });
 }
+
 
 function renderCart(){
   const el = document.getElementById("cart");
@@ -300,7 +314,7 @@ function renderCart(){
       <div class="cartLine">
         <div>
           <div class="cartName">${i.name}</div>
-          <div class="cartMeta">${i.sku} • ${money(i.unit_price_xrp)}</div>
+          <div class="cartMeta">${i.sku} • ${money(i.unit_price_rlusd)}</div>
         </div>
         <div class="qty">
           <button class="qtyBtn" onclick="decQty('${i.sku}')">−</button>
@@ -311,7 +325,7 @@ function renderCart(){
     `).join("");
   }
 
-  const total = items.reduce((s,i)=>s + i.unit_price_xrp*i.qty,0);
+  const total = items.reduce((s,i)=>s + i.unit_price_rlusd*i.qty,0);
   document.getElementById("total").textContent = money(total);
 
   const canCheckout = total > 0;
@@ -357,7 +371,8 @@ async function checkout(){
   document.getElementById("payOtherBtn").disabled = false;
 
   setPayState(`Order ${j.order.order_id}`, "PENDING");
-  document.getElementById("payHint").textContent = `Total: ${money(j.order.total_xrp)}`;
+  // document.getElementById("payHint").textContent = `Total: ${money(j.order.total_xrp)}`;
+  document.getElementById("payHint").textContent = `Total: ${money(j.order.total_rlusd)}`;
 
   // Keep cart for now (you can clear if you prefer)
   await loadOrders();
@@ -391,11 +406,11 @@ async function loadOrders(){
     <div class="orderItem">
       <div>
         <div class="orderId">${o.order_id} ${badgeFor(o.status)}</div>
-        <div class="orderSmall">${o.items.length} item(s) • Total ${money(o.total_xrp)}</div>
+        <div class="orderSmall">${o.items.length} item(s) • Total ${money(o.total_rlusd)}</div>
       </div>
       <div class="orderRight">
         <div class="orderActions">
-          <button class="btnPrimary" onclick="openRipplitFor('${o.order_id}', ${o.total_xrp})">Pay via Ripplit</button>
+          <button class="btnPrimary" onclick="openRipplitFor('${o.order_id}', ${o.total_rlusd})">Pay via Ripplit</button>
           <button class="btn" onclick="noop()">Other Payment Methods</button>
         </div>
       </div>
@@ -403,12 +418,20 @@ async function loadOrders(){
   `).join("");
 }
 
-function openRipplitFor(orderId, totalXrp){
-  // Rebuild redirect URL for an existing order:
+// function openRipplitFor(orderId, totalXrp){
+//   // Rebuild redirect URL for an existing order:
+//   const returnUrl = encodeURIComponent("http://127.0.0.1:8010/api/order/ripplit_callback");
+//   const redirect = `http://127.0.0.1:8020/static/pay.html?order_id=${orderId}&total_xrp=${totalXrp}&return_url=${returnUrl}`;
+//   window.open(redirect, "_blank");
+// }
+function openRipplitFor(orderId, totalRlusd){
   const returnUrl = encodeURIComponent("http://127.0.0.1:8010/api/order/ripplit_callback");
-  const redirect = `http://127.0.0.1:8020/static/pay.html?order_id=${orderId}&total_xrp=${totalXrp}&return_url=${returnUrl}`;
+  const redirect =
+    `http://127.0.0.1:8000/static/login.html?` +
+    `order_id=${orderId}&total_rlusd=${totalRlusd}&currency=RLUSD&return_url=${returnUrl}`;
   window.open(redirect, "_blank");
 }
+
 
 function noop(){}
 

@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -123,10 +124,13 @@ const qs = new URLSearchParams(window.location.search);
 const user = qs.get("user") || "";
 const order_id = qs.get("order_id") || "";
 const total_xrp = parseFloat(qs.get("total_xrp") || "0");
+const total_rlusd = parseFloat(qs.get("total_rlusd") || "0");
+const currency = qs.get("currency") || "RLUSD";
 const return_url = qs.get("return_url") || "";
 let inited = false;
 
 function fmtX(x){ return `${x.toFixed(2)} XRP`; }
+function fmtR(x){ return `${x.toFixed(2)} ${currency}`; }
 
 function logout(){ window.location.href = "/static/login.html"; }
 
@@ -185,7 +189,7 @@ async function loadHistory(){
           </div>
           <div style="text-align:right; min-width:160px">
             ${statusBadge(req.status)}
-            <div class="small" style="margin-top:6px"><b>Total:</b> ${fmtX(parseFloat(req.total_xrp))}</div>
+            <div class="small" style="margin-top:6px"><b>Total:</b> ${(req.total_rlusd != null) ? fmtR(parseFloat(req.total_rlusd)) : fmtX(parseFloat(req.total_xrp))}</div>
           </div>
         </div>
       `;
@@ -211,7 +215,7 @@ async function refreshBalance(){
 
 function calcShare(selected){
   const n = 1 + selected.length;
-  return total_xrp / n;
+  return total_rlusd / n;
 }
 
 async function startForAlice(){
@@ -220,8 +224,8 @@ async function startForAlice(){
   if(document.getElementById("cbChen")?.checked) selected.push("chen");
   if(selected.length === 0) return alert("Select at least one co-payee.");
 
-  const body = { order_id, total_xrp, return_url, item_label:"Marketplace order", selected_payees:selected };
-
+  // const body = { order_id, total_xrp, return_url, item_label:"Marketplace order", selected_payees:selected };
+  const body = { order_id, total_rlusd, currency, return_url, item_label:"Marketplace order", selected_payees:selected };
   const btn = document.getElementById("proceedBtn");
   btn.disabled = true;
   document.getElementById("aliceHint").textContent = "Processing… (creating escrow)";
@@ -295,12 +299,12 @@ function renderRightPanel(){
       return;
     }
 
-    const shareIfBoth = fmtX(calcShare(["bob","chen"]));
+    const shareIfBoth = fmtR(calcShare(["bob","chen"]));
     body.innerHTML = `
       <div class="muted" style="font-size:13px">Order</div>
       <div style="font-weight:950">${order_id}</div>
       <div class="muted" style="font-size:13px; margin-top:10px">Total</div>
-      <div style="font-weight:950">${fmtX(total_xrp)}</div>
+      <div style="font-weight:950">${fmtR(total_rlusd)}</div>
 
       <div class="muted" style="font-size:13px; margin-top:10px">Choose co-payees</div>
       <div class="contact">

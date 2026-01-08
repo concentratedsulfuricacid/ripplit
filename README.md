@@ -118,10 +118,10 @@ flowchart LR
   EC2["EscrowCreate (bob)"] --> Q
   EC3["EscrowCreate (chen)"] --> Q
   Q -- yes + AUTO_FINISH=true --> EF["EscrowFinish x3 (fulfillment if Condition set)"]
-  EF --> PAID[Order: PAID]
-  PAID --> CB[POST return_url callback]
-  Q -- no + deadline passes --> EXP[Order: EXPIRED]
-  EXP --> CAN[EscrowCancel (after CancelAfter)]
+  EF --> PAID["Order: PAID"]
+  PAID --> CB["POST return_url callback"]
+  Q -- no + deadline passes --> EXP["Order: EXPIRED"]
+  EXP --> CAN["EscrowCancel (after CancelAfter)"]
 ```
 
 ## Run locally

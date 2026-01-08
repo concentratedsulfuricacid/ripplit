@@ -1,371 +1,83 @@
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
-from uuid import uuid4
-import binascii
-import json
-import urllib.request
+from datetime import datetime, timezone, timedelta
+import time
+from typing import Dict
 
-from .config import Settings
-from .state import StateStore
+from decimal import Decimal
+from xrpl.utils import xrp_to_drops
+from xrpl.clients import JsonRpcClient
+from xrpl.wallet import Wallet, generate_faucet_wallet
+from xrpl.utils import datetime_to_ripple_time, xrp_to_drops
+from xrpl.models.requests import AccountInfo
+from xrpl.models.transactions import EscrowCreate, EscrowFinish
+from xrpl.transaction import submit_and_wait
+from .config import XRPL_TESTNET_JSON_RPC, ESCROW_FINISH_AFTER_S, ESCROW_CANCEL_AFTER_S
+import os
+from xrpl.clients import JsonRpcClient
 
-
-class XrplServiceError(RuntimeError):
-    pass
-
-
-@dataclass
-class EscrowResult:
-    offer_sequence: int
-    tx_hash: str
-    validated: bool
+XRPL_RPC = os.getenv("XRPL_RPC", "https://testnet.xrpl-labs.com/")
+client = JsonRpcClient(XRPL_RPC)
 
 
-@dataclass
-class TxSubmitResult:
-    tx_hash: str
-    validated: bool
+def _ripple_time_in(seconds_from_now: int) -> int:
+    return datetime_to_ripple_time(datetime.utcnow()) + int(seconds_from_now)
 
+def create_funded_wallet() -> Wallet:
+    return generate_faucet_wallet(client)
 
-class XrplService:
-    def __init__(self, settings: Settings, state: StateStore) -> None:
-        self.settings = settings
-        self.state = state
-        self.mode = settings.xrpl_mode.lower()
-        self._client = None
-        if self.mode != "mock":
-            self._init_client()
+def get_xrp_balance(address: str) -> float:
+    resp = client.request(AccountInfo(account=address, ledger_index="validated")).result
+    return int(resp["account_data"]["Balance"]) / 1_000_000
 
-    def _init_client(self) -> None:
-        try:
-            from xrpl.asyncio.clients import AsyncJsonRpcClient
-        except ImportError as exc:
-            raise XrplServiceError(
-                "xrpl-py is required for XRPL mode 'testnet'. Install requirements.txt"
-            ) from exc
-        self._client = AsyncJsonRpcClient(self.settings.xrpl_json_rpc_url)
+def get_balances(addresses: Dict[str, str]) -> Dict[str, float]:
+    return {k: get_xrp_balance(v) for k, v in addresses.items()}
 
-    def _wallet_from_seed(self, seed: str):
-        from xrpl.wallet import Wallet
-        from xrpl.core.keypairs.main import CryptoAlgorithm
+def escrow_create(owner_wallet, destination: str, amount_xrp: float | Decimal):
+    now_utc = datetime.now(timezone.utc)
 
-        algorithm = (
-            CryptoAlgorithm.ED25519 if seed.startswith("sEd") else CryptoAlgorithm.SECP256K1
-        )
-        return Wallet.from_seed(seed, algorithm=algorithm)
+    # make it finishable shortly after submission
+    finish_after = datetime_to_ripple_time(now_utc + timedelta(seconds=5))
 
-    def _raw_request(self, method: str, params: Dict[str, Any]) -> Dict[str, Any]:
-        payload = json.dumps({"method": method, "params": [params]}).encode("utf-8")
-        req = urllib.request.Request(
-            self.settings.xrpl_json_rpc_url,
-            data=payload,
-            headers={"Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            return json.load(resp)
+    # cancel in e.g. 15 minutes (tune as you like)
+    cancel_after = datetime_to_ripple_time(now_utc + timedelta(minutes=15))
 
-    def get_balance_xrp(self, address: str) -> float:
-        if self.mode == "mock":
-            return 0.0
-        result = self._raw_request(
-            "account_info", {"account": address, "ledger_index": "validated"}
-        ).get("result", {})
-        account_data = result.get("account_data") or {}
-        drops = account_data.get("Balance")
-        if drops is None:
-            raise XrplServiceError("Balance unavailable for account")
-        try:
-            return round(int(drops) / 1_000_000, 6)
-        except (ValueError, TypeError) as exc:
-            raise XrplServiceError("Invalid balance data") from exc
+    amount_drops = xrp_to_drops(Decimal(str(amount_xrp)))
 
-    def generate_condition(self) -> Dict[str, str]:
-        try:
-            from cryptoconditions import PreimageSha256
-        except ImportError as exc:
-            raise XrplServiceError(
-                "cryptoconditions is required for XRPL conditional escrows"
-            ) from exc
-        preimage = uuid4().bytes + uuid4().bytes
-        condition = PreimageSha256(preimage=preimage)
-        condition_hex = binascii.hexlify(condition.condition_binary).decode("utf-8").upper()
-        fulfillment_hex = binascii.hexlify(condition.serialize_binary()).decode("utf-8").upper()
-        return {"condition": condition_hex, "fulfillment": fulfillment_hex}
+    tx = EscrowCreate(
+        account=owner_wallet.classic_address,
+        destination=destination,
+        amount=amount_drops,
+        finish_after=finish_after,
+        cancel_after=cancel_after,
+    )
 
-    async def create_escrow(
-        self,
-        payer_seed: str,
-        payer_address: str,
-        amount_drops: str,
-        destination: str,
-        cancel_after: int,
-        condition: Optional[str],
-    ) -> EscrowResult:
-        if self.mode == "mock":
-            return self._mock_create_escrow(payer_address)
-        return await self._real_create_escrow(
-            payer_seed,
-            payer_address,
-            amount_drops,
-            destination,
-            cancel_after,
-            condition,
-        )
+    print("ESCROW TX:", tx.to_xrpl())
 
-    async def finish_escrow(
-        self,
-        merchant_seed: str,
-        owner_address: str,
-        offer_sequence: int,
-        fulfillment: Optional[str],
-        condition: Optional[str],
-    ) -> TxSubmitResult:
-        if self.mode == "mock":
-            return self._mock_finish_escrow()
-        return await self._real_finish_escrow(
-            merchant_seed, owner_address, offer_sequence, fulfillment, condition
-        )
+    result = submit_and_wait(tx, client, owner_wallet).result
+    return {
+        "tx_hash": result.get("hash"),
+        "sequence": result["tx_json"]["Sequence"],  # or offer sequence depending on your implementation
+    }
 
-    async def cancel_escrow(
-        self,
-        merchant_seed: str,
-        owner_address: str,
-        offer_sequence: int,
-    ) -> TxSubmitResult:
-        if self.mode == "mock":
-            return self._mock_cancel_escrow()
-        return await self._real_cancel_escrow(merchant_seed, owner_address, offer_sequence)
+def wait_until_finishable():
+    time.sleep(max(ESCROW_FINISH_AFTER_S + 1, 2))
 
-    def submit_did_set(self, seed: str, address: str, did_document: str, uri: str) -> TxSubmitResult:
-        if self.mode == "mock":
-            return self._mock_finish_escrow()
-        payload = {
-            "secret": seed,
-            "tx_json": {
-                "TransactionType": "DIDSet",
-                "Account": address,
-                "DIDDocument": did_document,
-                "URI": uri,
-            },
-        }
-        result = self._raw_request("submit", payload).get("result", {})
-        tx_hash = result.get("tx_json", {}).get("hash") or result.get("hash") or uuid4().hex
-        validated = result.get("validated", False)
-        return TxSubmitResult(tx_hash=tx_hash, validated=validated)
+def escrow_finish(finisher_wallet: Wallet, owner_address: str, offer_sequence: int) -> str:
+    tx = EscrowFinish(
+        account=finisher_wallet.classic_address,
+        owner=owner_address,
+        offer_sequence=int(offer_sequence),
+    )
+    result = submit_and_wait(tx, client, finisher_wallet).result
+    return result.get("hash", "")
 
-    def fetch_did_object(self, address: str) -> Optional[Dict[str, Any]]:
-        if self.mode == "mock":
-            return None
-        result = self._raw_request(
-            "account_objects", {"account": address, "type": "did"}
-        ).get("result", {})
-        objects = result.get("account_objects", [])
-        if not objects:
-            return None
-        return objects[0]
+from xrpl.models.transactions import Payment
 
-    def find_escrow_create(
-        self,
-        owner_address: str,
-        destination: str,
-        amount_drops: str,
-        condition: Optional[str],
-        cancel_after: int,
-        limit: int = 50,
-    ) -> Optional[EscrowResult]:
-        if self.mode == "mock":
-            return None
-        transactions = self._account_transactions(owner_address, limit)
-        for entry in transactions:
-            tx = entry.get("tx") or entry.get("tx_json") or {}
-            if tx.get("TransactionType") != "EscrowCreate":
-                continue
-            if tx.get("Destination") != destination:
-                continue
-            if tx.get("Amount") != amount_drops:
-                continue
-            if condition and tx.get("Condition") != condition:
-                continue
-            if tx.get("CancelAfter") != cancel_after:
-                continue
-            validated = entry.get("validated", False)
-            tx_hash = tx.get("hash") or entry.get("hash") or uuid4().hex
-            offer_sequence = tx.get("Sequence")
-            if offer_sequence is None:
-                continue
-            return EscrowResult(
-                offer_sequence=int(offer_sequence),
-                tx_hash=tx_hash,
-                validated=validated,
-            )
-        return None
+def send_payment(sender_wallet: Wallet, destination: str, amount_xrp: float) -> str:
+    tx = Payment(
+        account=sender_wallet.classic_address,
+        destination=destination,
+        amount=xrp_to_drops(amount_xrp),
+    )
+    result = submit_and_wait(tx, client, sender_wallet).result
+    return result.get("hash", "")
 
-    def find_escrow_finish(
-        self,
-        merchant_address: str,
-        owner_address: str,
-        offer_sequence: int,
-        limit: int = 50,
-    ) -> Optional[TxSubmitResult]:
-        if self.mode == "mock":
-            return None
-        transactions = self._account_transactions(merchant_address, limit)
-        for entry in transactions:
-            tx = entry.get("tx") or entry.get("tx_json") or {}
-            if tx.get("TransactionType") != "EscrowFinish":
-                continue
-            if tx.get("Owner") != owner_address:
-                continue
-            if tx.get("OfferSequence") != offer_sequence:
-                continue
-            tx_hash = tx.get("hash") or entry.get("hash") or uuid4().hex
-            return TxSubmitResult(tx_hash=tx_hash, validated=entry.get("validated", False))
-        return None
-
-    def find_escrow_cancel(
-        self,
-        merchant_address: str,
-        owner_address: str,
-        offer_sequence: int,
-        limit: int = 50,
-    ) -> Optional[TxSubmitResult]:
-        if self.mode == "mock":
-            return None
-        transactions = self._account_transactions(merchant_address, limit)
-        for entry in transactions:
-            tx = entry.get("tx") or entry.get("tx_json") or {}
-            if tx.get("TransactionType") != "EscrowCancel":
-                continue
-            if tx.get("Owner") != owner_address:
-                continue
-            if tx.get("OfferSequence") != offer_sequence:
-                continue
-            tx_hash = tx.get("hash") or entry.get("hash") or uuid4().hex
-            return TxSubmitResult(tx_hash=tx_hash, validated=entry.get("validated", False))
-        return None
-
-    def _account_transactions(self, address: str, limit: int) -> List[Dict[str, Any]]:
-        result = self._raw_request(
-            "account_tx",
-            {
-                "account": address,
-                "ledger_index_min": -1,
-                "ledger_index_max": -1,
-                "limit": limit,
-                "binary": False,
-            },
-        ).get("result", {})
-        return result.get("transactions", [])
-
-    def _mock_create_escrow(self, payer_address: str) -> EscrowResult:
-        sequence = self.state.next_sequence(payer_address)
-        tx_hash = uuid4().hex
-        return EscrowResult(offer_sequence=sequence, tx_hash=tx_hash, validated=True)
-
-    def _mock_finish_escrow(self) -> TxSubmitResult:
-        return TxSubmitResult(tx_hash=uuid4().hex, validated=True)
-
-    def _mock_cancel_escrow(self) -> TxSubmitResult:
-        return TxSubmitResult(tx_hash=uuid4().hex, validated=True)
-
-    async def _real_create_escrow(
-        self,
-        payer_seed: str,
-        payer_address: str,
-        amount_drops: str,
-        destination: str,
-        cancel_after: int,
-        condition: Optional[str],
-    ) -> EscrowResult:
-        if not payer_seed:
-            raise XrplServiceError("Missing payer seed for XRPL escrow create")
-        if not self._client:
-            raise XrplServiceError("XRPL client not initialized")
-        from xrpl.models.transactions import EscrowCreate
-        from xrpl.asyncio.transaction import submit_and_wait
-
-        wallet = self._wallet_from_seed(payer_seed)
-        tx = EscrowCreate(
-            account=wallet.classic_address,
-            amount=amount_drops,
-            destination=destination,
-            cancel_after=cancel_after,
-            condition=condition,
-        )
-        response = await submit_and_wait(tx, self._client, wallet)
-        result = response.result
-        tx_hash = result.get("hash", uuid4().hex)
-        offer_sequence = result.get("tx_json", {}).get("Sequence")
-        if offer_sequence is None:
-            offer_sequence = tx.sequence
-        validated = result.get("validated", False)
-        return EscrowResult(offer_sequence=int(offer_sequence), tx_hash=tx_hash, validated=validated)
-
-    async def _real_finish_escrow(
-        self,
-        merchant_seed: str,
-        owner_address: str,
-        offer_sequence: int,
-        fulfillment: Optional[str],
-        condition: Optional[str],
-    ) -> TxSubmitResult:
-        if not merchant_seed:
-            raise XrplServiceError("Missing merchant seed for XRPL escrow finish")
-        if not self._client:
-            raise XrplServiceError("XRPL client not initialized")
-        from xrpl.models.transactions import EscrowFinish
-        from xrpl.asyncio.transaction import submit_and_wait
-
-        wallet = self._wallet_from_seed(merchant_seed)
-        tx = EscrowFinish(
-            account=wallet.classic_address,
-            owner=owner_address,
-            offer_sequence=offer_sequence,
-            fulfillment=fulfillment,
-            condition=condition,
-        )
-        response = await submit_and_wait(tx, self._client, wallet)
-        result = response.result
-        tx_hash = result.get("hash", uuid4().hex)
-        return TxSubmitResult(tx_hash=tx_hash, validated=result.get("validated", False))
-
-    async def _real_cancel_escrow(
-        self,
-        merchant_seed: str,
-        owner_address: str,
-        offer_sequence: int,
-    ) -> TxSubmitResult:
-        if not merchant_seed:
-            raise XrplServiceError("Missing merchant seed for XRPL escrow cancel")
-        if not self._client:
-            raise XrplServiceError("XRPL client not initialized")
-        from xrpl.models.transactions import EscrowCancel
-        from xrpl.asyncio.transaction import submit_and_wait
-
-        wallet = self._wallet_from_seed(merchant_seed)
-        tx = EscrowCancel(
-            account=wallet.classic_address,
-            owner=owner_address,
-            offer_sequence=offer_sequence,
-        )
-        response = await submit_and_wait(tx, self._client, wallet)
-        result = response.result
-        tx_hash = result.get("hash", uuid4().hex)
-        return TxSubmitResult(tx_hash=tx_hash, validated=result.get("validated", False))
-
-
-@dataclass
-class XrplEscrowEvent:
-    handle: str
-    offer_sequence: int
-    tx_hash: str
-    timestamp: datetime
-
-    @classmethod
-    def from_result(cls, handle: str, result: EscrowResult) -> "XrplEscrowEvent":
-        return cls(
-            handle=handle,
-            offer_sequence=result.offer_sequence,
-            tx_hash=result.tx_hash,
-            timestamp=datetime.now(timezone.utc),
-        )

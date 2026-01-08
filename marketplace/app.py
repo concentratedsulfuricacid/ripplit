@@ -20,7 +20,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 ORDERS: Dict[str, Dict[str, Any]] = {}
 
-RIPPLIT_PAY_URL = os.getenv("RIPPLIT_PAY_URL", "http://127.0.0.1:8000/static/marketplace.html")
+RIPPLIT_PAY_URL = os.getenv("RIPPLIT_PAY_URL", "http://127.0.0.1:8000/static/login.html")
 RIPPLIT_API_BASE = os.getenv("RIPPLIT_API_BASE", "http://127.0.0.1:8000")
 RIPPLIT_API_KEY = os.getenv("RIPPLIT_API_KEY", os.getenv("API_KEY", ""))
 MARKETPLACE_BASE = os.getenv("MARKETPLACE_BASE", "http://127.0.0.1:8010")

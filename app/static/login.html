@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Ripplit Login</title>
+  <style>
+    :root{
+      --bg:#f7fafc;
+      --card:#ffffff;
+      --text:#0f172a;
+      --muted:#64748b;
+      --border:rgba(15,23,42,.12);
+      --shadow:0 18px 55px rgba(15,23,42,.12);
+      --r:18px;
+      --accent:#2563eb;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background: radial-gradient(900px 500px at 20% 0%, rgba(37,99,235,.12), transparent 55%),
+                  radial-gradient(900px 500px at 80% 10%, rgba(16,185,129,.10), transparent 50%),
+                  var(--bg);
+      color:var(--text);
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+    }
+    .card{
+      width:min(520px, 100%);
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .hdr{
+      padding:18px 18px 10px 18px;
+      display:flex; align-items:center; gap:12px;
+    }
+    .logo{
+      width:46px; height:46px; border-radius:16px;
+      background: linear-gradient(135deg, rgba(37,99,235,.95), rgba(16,185,129,.85));
+    }
+    h1{margin:0; font-size:18px}
+    .sub{color:var(--muted); font-size:13px; margin-top:3px}
+    .body{padding:0 18px 18px 18px}
+    .box{
+      margin-top:10px;
+      padding:12px;
+      border:1px solid var(--border);
+      border-radius: 14px;
+      background:#f8fafc;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.35;
+    }
+    label{display:block; font-size:13px; color:var(--muted); margin-top:12px; margin-bottom:6px}
+    select,input{
+      width:100%;
+      padding:12px 12px;
+      border-radius:14px;
+      border:1px solid var(--border);
+      outline:none;
+      font-size:14px;
+      background:white;
+    }
+    .row{display:flex; gap:10px}
+    button{
+      margin-top:14px;
+      width:100%;
+      border:0;
+      cursor:pointer;
+      border-radius:14px;
+      padding:12px 12px;
+      font-weight:900;
+      color:white;
+      background: linear-gradient(135deg, rgba(37,99,235,.95), rgba(37,99,235,.75));
+    }
+    .hint{margin-top:10px; color:var(--muted); font-size:12px}
+    code{background:rgba(0,0,0,.06); padding:2px 6px; border-radius:8px}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="hdr">
+      <div class="logo"></div>
+      <div>
+        <h1>Ripplit</h1>
+        <div class="sub">Login to your wallet</div>
+      </div>
+    </div>
+    <div class="body">
+      <div class="box" id="orderBox"></div>
+
+      <label>Wallet</label>
+      <select id="user">
+        <option value="alice">Alice</option>
+        <option value="bob">Bob</option>
+        <option value="chen">Chen</option>
+      </select>
+
+      <label>Demo PIN</label>
+      <input id="pin" type="password" placeholder="Alice: 1111, Bob: 2222, Chen: 3333" />
+
+      <button onclick="login()">Login</button>
+      <div class="hint" id="hint"></div>
+    </div>
+  </div>
+
+<script>
+const qs = new URLSearchParams(window.location.search);
+const order_id = qs.get("order_id") || "";
+const total_xrp = qs.get("total_xrp") || "";
+const return_url = qs.get("return_url") || "";
+
+function renderOrderBox(){
+  const box = document.getElementById("orderBox");
+  if(order_id){
+    box.innerHTML = `You were redirected for order <b>${order_id}</b><br/>Total: <b>${total_xrp} XRP</b>`;
+  } else {
+    box.innerHTML = `No active checkout. You can still login to view your wallet.`;
+  }
+}
+renderOrderBox();
+
+const PINS = { alice:"1111", bob:"2222", chen:"3333" };
+
+function login(){
+  const user = document.getElementById("user").value;
+  const pin = document.getElementById("pin").value.trim();
+  const hint = document.getElementById("hint");
+
+  if(pin !== PINS[user]){
+    hint.textContent = "Wrong PIN (demo).";
+    return;
+  }
+
+  // Redirect into wallet view, preserving order params if they exist
+  const p = new URLSearchParams();
+  p.set("user", user);
+  if(order_id) p.set("order_id", order_id);
+  if(total_xrp) p.set("total_xrp", total_xrp);
+  if(return_url) p.set("return_url", return_url);
+
+  window.location.href = `/static/wallet.html?${p.toString()}`;
+}
+</script>
+</body>
+</html>

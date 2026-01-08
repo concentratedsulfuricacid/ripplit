@@ -1,326 +1,219 @@
-from datetime import datetime, timedelta, timezone
-import hashlib
-import json
-from typing import Dict, List, Optional
-from uuid import uuid4
+import time
+import uuid
+from typing import Dict, List
 
-from .config import Settings, to_ripple_time
-from .did_registry import DidRegistry
-from .models import (
-    GroupRequest,
-    GroupStatus,
-    Order,
-    OrderStatus,
-    Participant,
-    ParticipantStatus,
-)
-from .state import StateStore
-from .xrpl_service import XrplEscrowEvent, XrplService, XrplServiceError
+import httpx
 
+from .state import STATE
+from .models import Participant, User, StartFromRedirect
+from .did_registry import resolve_did
+from .xrpl_service import escrow_create, escrow_finish, wait_until_finishable
+from .config import REQUEST_EXPIRES_S
 
-DROPS_PER_XRP = 1_000_000
+def _id(prefix: str) -> str:
+    return f"{prefix}_{str(uuid.uuid4())[:8]}"
 
+def ensure_inited():
+    if not STATE["wallets"] or STATE["merchant"] is None or STATE["coordinator"] is None:
+        raise RuntimeError("Ripplit not initialized. Click 'Initialize Wallet' first.")
 
-def xrp_to_drops(amount_xrp: float) -> str:
-    return str(int(round(amount_xrp * DROPS_PER_XRP)))
+def _now() -> int:
+    return int(time.time())
 
+def _compute_status(req: Dict) -> str:
+    if req["status"] == "FULFILLED":
+        return "FULFILLED"
+    if _now() >= req["expires_at_unix"]:
+        return "EXPIRED"
+    return "PENDING"
 
-class GroupPayService:
-    def __init__(
-        self,
-        settings: Settings,
-        state: StateStore,
-        registry: DidRegistry,
-        xrpl_service: XrplService,
-    ) -> None:
-        self.settings = settings
-        self.state = state
-        self.registry = registry
-        self.xrpl = xrpl_service
+def list_history():
+    ensure_inited()
+    out = []
+    for req_id, req in STATE["requests"].items():
+        status = _compute_status(req)
+        if status == "EXPIRED" and req["status"] != "FULFILLED":
+            req["status"] = "EXPIRED"
+            STATE["requests"][req_id] = req
+        out.append({
+            "request_id": req_id,
+            "order_id": req["order_id"],
+            "total_xrp": req["total_xrp"],
+            "status": _compute_status(req),
+            "created_at_unix": req["created_at_unix"],
+            "expires_at_unix": req["expires_at_unix"],
+        })
+    out.sort(key=lambda x: x["created_at_unix"], reverse=True)
+    return out
 
-    def create_group_request(
-        self,
-        order: Order,
-        participants: List[str],
-        split: str,
-        custom_amounts: Optional[Dict[str, float]],
-        deadline_minutes: Optional[int],
-    ) -> GroupRequest:
-        contacts = []
-        for handle in participants:
-            contact = self.registry.get_contact(handle)
-            if not contact:
-                raise ValueError(f"Unknown handle: {handle}")
-            contacts.append(contact)
+def create_request_from_redirect(req: StartFromRedirect) -> Dict:
+    ensure_inited()
+    vault_address = STATE["coordinator"].classic_address
+    merchant_address = STATE["merchant"].classic_address
 
-        amounts = self._split_amounts(order.total_xrp, participants, split, custom_amounts)
-        deadline = datetime.now(timezone.utc) + timedelta(
-            minutes=deadline_minutes or self.settings.default_deadline_minutes
+    selected = [u for u in req.selected_payees if u in ["bob", "chen"]]
+    participants_users: List[User] = ["alice"] + selected
+    n = len(participants_users)
+    if n < 2:
+        raise ValueError("Select at least one co-payee (Bob or Chen).")
+
+    share = float(req.total_xrp) / n
+
+    merchant_address = STATE["merchant"].classic_address
+    created_at = _now()
+    expires_at = created_at + REQUEST_EXPIRES_S
+
+    request_id = _id("tx")
+
+    participants: Dict[User, Dict] = {}
+    for u in participants_users:
+        did = f"did:ripplit:{u}"
+        addr = resolve_did(did)
+        participants[u] = Participant(did=did, address=addr, share_xrp=share).model_dump()
+
+    request_obj = {
+        "vault_address": vault_address,
+        "request_id": request_id,
+        "order_id": req.order_id,
+        "item_label": req.item_label or "Marketplace order",
+        "total_xrp": float(req.total_xrp),
+        "return_url": req.return_url,
+        "merchant_address": merchant_address,
+        "created_at_unix": created_at,
+        "expires_at_unix": expires_at,
+        "status": "PENDING",
+        "participants": participants,
+        "finish_tx_hashes": {},
+    }
+
+    STATE["requests"][request_id] = request_obj
+
+    # Alice immediately pays her share
+    _pay_internal(request_id, "alice")
+    return STATE["requests"][request_id]
+
+def inbox_for(user: User):
+    ensure_inited()
+    out = []
+    for req in STATE["requests"].values():
+        status = _compute_status(req)
+        if status != "PENDING":
+            continue
+        if user not in req["participants"]:
+            continue
+        if req["participants"][user]["status"] == "REQUESTED":
+            out.append(req)
+    out.sort(key=lambda r: r["created_at_unix"], reverse=True)
+    return out
+
+def pay(request_id: str, payer: User) -> Dict:
+    ensure_inited()
+    if request_id not in STATE["requests"]:
+        raise ValueError("Unknown request_id")
+    return _pay_internal(request_id, payer)
+
+def _pay_internal(request_id: str, payer: User) -> Dict:
+    req = STATE["requests"][request_id]
+    status = _compute_status(req)
+
+    if status == "EXPIRED":
+        req["status"] = "EXPIRED"
+        STATE["requests"][request_id] = req
+        return req
+
+    if status == "FULFILLED":
+        return req
+
+    if payer not in req["participants"]:
+        raise ValueError(f"{payer} is not part of this request.")
+
+    p = req["participants"][payer]
+    if p["status"] == "PAID":
+        return req
+
+    payer_wallet = STATE["wallets"][payer]
+
+    vault_dest = req.get("vault_address") or STATE["coordinator"].classic_address
+    print("ESCROW DEST:", (req.get("vault_address")), "MERCHANT:", req.get("merchant_address"))
+    info = escrow_create(payer_wallet, vault_dest, float(p["share_xrp"]))
+
+    p["status"] = "PAID"
+    p["escrow_owner"] = payer_wallet.classic_address
+    p["escrow_offer_sequence"] = info["sequence"]
+    p["escrow_create_tx_hash"] = info["tx_hash"]
+    req["participants"][payer] = p
+
+    if all(pp["status"] == "PAID" for pp in req["participants"].values()):
+        _settle_and_callback(req)
+
+    STATE["requests"][request_id] = req
+    return req
+
+def _settle_and_callback(req: Dict):
+    wait_until_finishable()
+    finisher = STATE["coordinator"]
+    finish_hashes = {}
+
+    for u, p in req["participants"].items():
+        finish_hashes[u] = escrow_finish(
+            finisher_wallet=finisher,
+            owner_address=p["escrow_owner"],
+            offer_sequence=int(p["escrow_offer_sequence"]),
         )
-        fulfillment = None
-        condition = None
-        if self.settings.use_condition:
-            condition_payload = self.xrpl.generate_condition()
-            condition = condition_payload["condition"]
-            fulfillment = condition_payload["fulfillment"]
 
-        participant_rows: List[Participant] = []
-        for contact in contacts:
-            amount_xrp = amounts[contact.handle]
-            participant_rows.append(
-                Participant(
-                    handle=contact.handle,
-                    address=contact.address,
-                    amount_xrp=amount_xrp,
-                    amount_drops=xrp_to_drops(amount_xrp),
-                )
-            )
+    req["finish_tx_hashes"] = finish_hashes
+    req["status"] = "FULFILLED"
 
-        terms_hash = self._terms_hash(order, participant_rows, deadline, condition)
-        request = GroupRequest(
-            id=uuid4().hex,
-            order_id=order.id,
-            terms_hash=terms_hash,
-            participants=participant_rows,
-            deadline=deadline,
-            condition=condition,
-            fulfillment=fulfillment,
-            status=GroupStatus.FUNDING,
-            created_at=datetime.now(timezone.utc),
-        )
-        order.status = OrderStatus.FUNDING
-        order.request_id = request.id
-        self.state.save_order(order)
-        self.state.save_group_request(request)
-        return request
+    payload = {
+        "order_id": req["order_id"],
+        "status": "PAID",
+        "details": {
+            "ripplit_request_id": req["request_id"],
+            "finish_tx_hashes": finish_hashes,
+            "escrow_create_hashes": {u: req["participants"][u]["escrow_create_tx_hash"] for u in req["participants"]},
+        },
+    }
 
-    async def pay_share(self, request_id: str, handle: str) -> GroupRequest:
-        request = self.state.get_group_request(request_id)
-        await self._expire_if_needed(request)
-        if request.status in {GroupStatus.PAID, GroupStatus.EXPIRED}:
-            raise ValueError("Request is no longer payable")
-        participant = self._get_participant(request, handle)
-        if participant.status in {ParticipantStatus.ESCROWED, ParticipantStatus.FINISHED}:
-            return request
+    try:
+        httpx.post(req["return_url"], json=payload, timeout=15.0)
+    except Exception:
+        pass
 
-        seed = self.registry.get_seed(handle)
-        if self.xrpl.mode != "mock" and not seed:
-            raise XrplServiceError(f"Missing seed for {handle} in XRPL mode")
+    from .xrpl_service import send_payment
 
-        cancel_after = to_ripple_time(request.deadline)
-        escrow_result = await self.xrpl.create_escrow(
-            payer_seed=seed or "",
-            payer_address=participant.address,
-            amount_drops=participant.amount_drops,
-            destination=self.settings.merchant_address,
-            cancel_after=cancel_after,
-            condition=request.condition,
-        )
-        event = XrplEscrowEvent.from_result(handle, escrow_result)
-        participant.status = ParticipantStatus.ESCROWED
-        participant.escrow = self._new_escrow(participant.address, event, request.condition)
-        request.status = GroupStatus.FUNDING
-        self.state.save_group_request(request)
-        await self._maybe_finish(request)
-        return request
+    vault = STATE["coordinator"]
+    merchant = req["merchant_address"]
+    pay_hash = send_payment(vault, merchant, float(req["total_xrp"]))
+    req["merchant_payment_tx_hash"] = pay_hash
 
-    async def finish_request(self, request_id: str) -> GroupRequest:
-        request = self.state.get_group_request(request_id)
-        await self._finish_all(request)
-        return request
-
-    async def refresh_request(self, request_id: str) -> GroupRequest:
-        request = self.state.get_group_request(request_id)
-        self.sync_with_ledger(requests=[request])
-        await self._expire_if_needed(request)
-        return request
-
-    async def list_requests(self) -> List[GroupRequest]:
-        requests = self.state.list_group_requests()
-        self.sync_with_ledger(requests=requests)
-        for request in requests:
-            await self._expire_if_needed(request)
-        return requests
-
-    def sync_with_ledger(self, requests: Optional[List[GroupRequest]] = None) -> None:
-        if self.xrpl.mode == "mock":
-            return
-        active_requests = requests or self.state.list_group_requests()
-        now = datetime.now(timezone.utc)
-        for request in active_requests:
-            if request.status in {GroupStatus.PAID, GroupStatus.EXPIRED}:
+    def history_for(user: str):
+        ensure_inited()
+        out = []
+        for req_id, req in STATE["requests"].items():
+            if user not in req["participants"]:
                 continue
-            cancel_after = to_ripple_time(request.deadline)
-            for participant in request.participants:
-                if participant.status == ParticipantStatus.UNPAID:
-                    match = self.xrpl.find_escrow_create(
-                        owner_address=participant.address,
-                        destination=self.settings.merchant_address,
-                        amount_drops=participant.amount_drops,
-                        condition=request.condition,
-                        cancel_after=cancel_after,
-                    )
-                    if match and match.validated:
-                        event = XrplEscrowEvent.from_result(participant.handle, match)
-                        participant.status = ParticipantStatus.ESCROWED
-                        participant.escrow = self._new_escrow(
-                            participant.address, event, request.condition
-                        )
-                if participant.status == ParticipantStatus.ESCROWED and participant.escrow:
-                    finish = self.xrpl.find_escrow_finish(
-                        merchant_address=self.settings.merchant_address,
-                        owner_address=participant.address,
-                        offer_sequence=participant.escrow.offer_sequence,
-                    )
-                    if finish and finish.validated:
-                        participant.status = ParticipantStatus.FINISHED
-                        participant.escrow.finish_tx_hash = finish.tx_hash
-                        participant.escrow.finished_at = now
-                        continue
-                    cancel = self.xrpl.find_escrow_cancel(
-                        merchant_address=self.settings.merchant_address,
-                        owner_address=participant.address,
-                        offer_sequence=participant.escrow.offer_sequence,
-                    )
-                    if cancel and cancel.validated:
-                        participant.status = ParticipantStatus.REFUNDED
-                        participant.escrow.cancel_tx_hash = cancel.tx_hash
-                        participant.escrow.canceled_at = now
 
-            if all(p.status == ParticipantStatus.FINISHED for p in request.participants):
-                request.status = GroupStatus.PAID
-                order = self.state.get_order(request.order_id)
-                order.status = OrderStatus.PAID
-                self.state.save_order(order)
-            elif all(
-                p.status in {ParticipantStatus.ESCROWED, ParticipantStatus.FINISHED}
-                for p in request.participants
-            ):
-                request.status = GroupStatus.READY
-            else:
-                request.status = GroupStatus.FUNDING
+            status = _compute_status(req)
 
-            self.state.save_group_request(request)
+            # unpaid list for pending requests
+            unpaid = []
+            if status == "PENDING":
+                for u, p in req["participants"].items():
+                    if p.get("status") != "PAID":
+                        unpaid.append(u)
 
-    def _split_amounts(
-        self,
-        total_xrp: float,
-        participants: List[str],
-        split: str,
-        custom_amounts: Optional[Dict[str, float]],
-    ) -> Dict[str, float]:
-        if split == "custom":
-            if not custom_amounts:
-                raise ValueError("custom_amounts required for custom split")
-            total = round(sum(custom_amounts.values()), 6)
-            if round(total_xrp, 6) != total:
-                raise ValueError("Custom amounts must sum to total")
-            return custom_amounts
+            out.append({
+                "request_id": req_id,
+                "order_id": req["order_id"],
+                "item_label": req.get("item_label", ""),
+                "total_xrp": req["total_xrp"],
+                "status": status,
+                "created_at_unix": req["created_at_unix"],
+                "expires_at_unix": req["expires_at_unix"],
+                "unpaid": unpaid,
+                "participants": req["participants"],  # useful so UI can show "your share" & "your status"
+            })
 
-        count = len(participants)
-        if count == 0:
-            raise ValueError("Participants required")
-        share = round(total_xrp / count, 6)
-        amounts = {handle: share for handle in participants}
-        remainder = round(total_xrp - sum(amounts.values()), 6)
-        if remainder != 0:
-            amounts[participants[-1]] = round(amounts[participants[-1]] + remainder, 6)
-        return amounts
+        out.sort(key=lambda x: x["created_at_unix"], reverse=True)
+        return out
 
-    def _terms_hash(
-        self,
-        order: Order,
-        participants: List[Participant],
-        deadline: datetime,
-        condition: Optional[str],
-    ) -> str:
-        payload = {
-            "order_id": order.id,
-            "amounts": {p.handle: p.amount_xrp for p in participants},
-            "deadline": deadline.isoformat(),
-            "merchant": self.settings.merchant_address,
-            "participants": [p.handle for p in participants],
-            "condition": condition,
-        }
-        encoded = json.dumps(payload, sort_keys=True).encode("utf-8")
-        return hashlib.sha256(encoded).hexdigest()
-
-    def _get_participant(self, request: GroupRequest, handle: str) -> Participant:
-        for participant in request.participants:
-            if participant.handle == handle:
-                return participant
-        raise ValueError(f"Handle {handle} not part of request")
-
-    async def _maybe_finish(self, request: GroupRequest) -> None:
-        if not self.settings.auto_finish:
-            return
-        if any(p.status != ParticipantStatus.ESCROWED for p in request.participants):
-            return
-        request.status = GroupStatus.READY
-        await self._finish_all(request)
-
-    async def _finish_all(self, request: GroupRequest) -> None:
-        if request.status in {GroupStatus.PAID, GroupStatus.EXPIRED}:
-            return
-        if any(p.status == ParticipantStatus.UNPAID for p in request.participants):
-            request.status = GroupStatus.FUNDING
-            self.state.save_group_request(request)
-            return
-        for participant in request.participants:
-            if participant.status != ParticipantStatus.ESCROWED or not participant.escrow:
-                continue
-            result = await self.xrpl.finish_escrow(
-                merchant_seed=self.settings.merchant_seed,
-                owner_address=participant.address,
-                offer_sequence=participant.escrow.offer_sequence,
-                fulfillment=request.fulfillment,
-                condition=request.condition,
-            )
-            if result.validated:
-                participant.status = ParticipantStatus.FINISHED
-                participant.escrow.finished_at = datetime.now(timezone.utc)
-                participant.escrow.finish_tx_hash = result.tx_hash
-        if all(p.status == ParticipantStatus.FINISHED for p in request.participants):
-            request.status = GroupStatus.PAID
-            order = self.state.get_order(request.order_id)
-            order.status = OrderStatus.PAID
-            self.state.save_order(order)
-        self.state.save_group_request(request)
-
-    async def _expire_if_needed(self, request: GroupRequest) -> None:
-        if request.status in {GroupStatus.PAID, GroupStatus.EXPIRED}:
-            return
-        if datetime.now(timezone.utc) <= request.deadline:
-            return
-        for participant in request.participants:
-            if participant.escrow and participant.status == ParticipantStatus.ESCROWED:
-                result = await self.xrpl.cancel_escrow(
-                    merchant_seed=self.settings.merchant_seed,
-                    owner_address=participant.address,
-                    offer_sequence=participant.escrow.offer_sequence,
-                )
-                if result.validated:
-                    participant.status = ParticipantStatus.REFUNDED
-                    participant.escrow.canceled_at = datetime.now(timezone.utc)
-                    participant.escrow.cancel_tx_hash = result.tx_hash
-        request.status = GroupStatus.EXPIRED
-        order = self.state.get_order(request.order_id)
-        order.status = OrderStatus.EXPIRED
-        self.state.save_order(order)
-        self.state.save_group_request(request)
-
-    def _new_escrow(
-        self,
-        owner_address: str,
-        event: XrplEscrowEvent,
-        condition: Optional[str],
-    ) -> "EscrowRef":
-        from .models import EscrowRef
-
-        return EscrowRef(
-            owner_address=owner_address,
-            offer_sequence=event.offer_sequence,
-            tx_hash=event.tx_hash,
-            condition=condition,
-            created_at=event.timestamp,
-        )

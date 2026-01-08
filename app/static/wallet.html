@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Ripplit Wallet</title>
+  <style>
+    :root{
+      --bg:#f6f8ff; --card:#ffffff; --text:#0f172a; --muted:#64748b; --border:rgba(15,23,42,.12);
+      --shadow:0 14px 40px rgba(15,23,42,.10); --r:18px;
+      --accent:#2563eb; --good:#16a34a; --warn:#f59e0b; --danger:#ef4444;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background: radial-gradient(900px 500px at 20% 0%, rgba(37,99,235,.12), transparent 55%),
+                  radial-gradient(900px 500px at 80% 10%, rgba(22,163,74,.10), transparent 50%),
+                  var(--bg);
+      color:var(--text);
+    }
+    .wrap{max-width:1050px; margin:0 auto; padding:22px 16px 70px}
+    header{display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px;}
+    .brand{display:flex; align-items:center; gap:12px}
+    .logo{width:42px; height:42px; border-radius:16px;
+      background: linear-gradient(135deg, rgba(37,99,235,.95), rgba(22,163,74,.85)); box-shadow: var(--shadow);}
+    h1{margin:0; font-size:18px}
+    .sub{color:var(--muted); font-size:13px; margin-top:2px}
+    .grid{display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-top:12px}
+    @media (max-width: 900px){ .grid{grid-template-columns:1fr;} }
+    .card{background:var(--card); border:1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); overflow:hidden;}
+    .cardHeader{padding:14px 16px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:12px;}
+    .cardBody{padding:16px}
+    .pill{display:inline-flex; align-items:center; gap:8px; padding:7px 10px; border-radius:999px; border:1px solid var(--border);
+      color:var(--muted); background: #f8fafc; font-size:12px; white-space:nowrap;}
+    .balance{font-size:30px; font-weight:900; letter-spacing:-.02em;}
+    .muted{color:var(--muted)}
+    .btnRow{display:flex; gap:10px; flex-wrap:wrap}
+    button{border:0; cursor:pointer; border-radius: 14px; padding:10px 12px; font-weight:900;
+      transition: transform .04s ease, opacity .15s ease;}
+    button:active{transform: translateY(1px)}
+    .btn{background:#f1f5f9; color:var(--text); border:1px solid var(--border)}
+    .btnPrimary{background: linear-gradient(135deg, rgba(37,99,235,.95), rgba(37,99,235,.75)); color:white;}
+    .btnGood{background: linear-gradient(135deg, rgba(22,163,74,.95), rgba(22,163,74,.75)); color:white;}
+    .tag{font-size:12px; padding:5px 10px; border-radius:999px; border:1px solid var(--border); background:#f8fafc; color:var(--muted);}
+    .contact{display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border:1px solid var(--border);
+      border-radius: 14px; background:#ffffff; margin-top:10px;}
+    .req{padding:12px; border:1px solid var(--border); border-radius:14px; background:#fff; margin-top:10px;
+      display:flex; justify-content:space-between; gap:10px; align-items:flex-start;}
+    input[type="checkbox"]{width:18px; height:18px}
+    .badge{
+      display:inline-flex; align-items:center;
+      padding:4px 10px; border-radius:999px;
+      font-size:12px; font-weight:900;
+      border:1px solid var(--border);
+      background:#f8fafc; color:var(--muted);
+    }
+    .badge.good{ background: rgba(22,163,74,0.10); color: #166534; border-color: rgba(22,163,74,0.25); }
+    .badge.warn{ background: rgba(245,158,11,0.12); color: #92400e; border-color: rgba(245,158,11,0.25); }
+    .badge.danger{ background: rgba(239,68,68,0.10); color: #991b1b; border-color: rgba(239,68,68,0.25); }
+
+    .histItem{
+      padding:12px; border:1px solid var(--border); border-radius:14px;
+      background:#fff; margin-top:10px;
+      display:flex; justify-content:space-between; gap:12px; align-items:flex-start;
+    }
+    .small{ font-size:12px; color:var(--muted); margin-top:2px; }
+
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>Ripplit Wallet</h1>
+        <div class="sub" id="subtitle">—</div>
+      </div>
+    </div>
+    <div class="btnRow">
+      <button class="btn" onclick="refreshAll()">Refresh</button>
+      <button class="btnPrimary" onclick="logout()">Logout</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="card">
+      <div class="cardHeader">
+        <div style="font-weight:950">Wallet</div>
+        <div class="pill" id="userPill">—</div>
+      </div>
+      <div class="cardBody">
+        <div class="muted" style="font-size:13px">Balance</div>
+        <div class="balance" id="bal">—</div>
+        <div class="muted" style="font-size:12px" id="addr">—</div>
+      </div>
+    </div>
+
+    <div class="card" id="rightCard">
+      <div class="cardHeader">
+        <div style="font-weight:950" id="rightTitle">—</div>
+        <div class="tag" id="rightTag">—</div>
+      </div>
+      <div class="cardBody" id="rightBody"></div>
+    </div>
+  </div>
+  
+  <div class="card" style="margin-top:14px">
+    <div class="cardHeader">
+      <div style="font-weight:950">Transaction History</div>
+      <div class="tag" id="histTag">—</div>
+    </div>
+    <div class="cardBody" id="historyBody">
+      <div class="muted">Loading…</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const qs = new URLSearchParams(window.location.search);
+const user = qs.get("user") || "";
+const order_id = qs.get("order_id") || "";
+const total_xrp = parseFloat(qs.get("total_xrp") || "0");
+const return_url = qs.get("return_url") || "";
+let inited = false;
+
+function fmtX(x){ return `${x.toFixed(2)} XRP`; }
+
+function logout(){ window.location.href = "/static/login.html"; }
+
+// async function init(){
+//   const r = await fetch("/api/admin/init", { method:"POST" });
+//   const j = await r.json();
+//   inited = !j.error;
+//   await refreshAll();
+// }
+function fmtTs(unix){
+  if(!unix) return "—";
+  return new Date(unix * 1000).toLocaleString();
+}
+
+function statusBadge(status){
+  if(status === "FULFILLED") return `<span class="badge good">FULFILLED</span>`;
+  if(status === "EXPIRED") return `<span class="badge danger">EXPIRED</span>`;
+  return `<span class="badge warn">PENDING</span>`;
+}
+
+async function loadHistory(){
+  const body = document.getElementById("historyBody");
+  const tag = document.getElementById("histTag");
+
+  try{
+    const r = await fetch(`/api/ripplit/history/${user}`);
+    const j = await r.json();
+    const list = (j.history || []);
+
+    tag.textContent = `${list.length} total`;
+
+    if(list.length === 0){
+      body.innerHTML = `<div class="muted">No past transactions yet.</div>`;
+      return;
+    }
+
+    body.innerHTML = list.map(req => {
+      const you = req.participants?.[user];
+      const youStatus = you?.status ? you.status : "—";
+      const youShare = (you?.share_xrp != null) ? fmtX(parseFloat(you.share_xrp)) : "—";
+
+      let pendingLine = "";
+      if(req.status === "PENDING"){
+        const unpaid = (req.unpaid || []).map(u => u.toUpperCase());
+        pendingLine = `<div class="small"><b>Not paid:</b> ${unpaid.length ? unpaid.join(", ") : "—"}</div>`;
+      }
+
+      return `
+        <div class="histItem">
+          <div>
+            <div style="font-weight:950">${req.order_id}</div>
+            <div class="small">${req.item_label || "Marketplace order"}</div>
+            <div class="small">Created: ${fmtTs(req.created_at_unix)} · Expires: ${fmtTs(req.expires_at_unix)}</div>
+            <div class="small"><b>Your share:</b> ${youShare} · <b>Your status:</b> ${youStatus}</div>
+            ${pendingLine}
+          </div>
+          <div style="text-align:right; min-width:160px">
+            ${statusBadge(req.status)}
+            <div class="small" style="margin-top:6px"><b>Total:</b> ${fmtX(parseFloat(req.total_xrp))}</div>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+  } catch(e){
+    body.innerHTML = `<div class="muted">Failed to load history.</div>`;
+  }
+}
+
+
+async function refreshBalance(){
+  const r = await fetch(`/api/wallet/balance/${user}`);
+  const j = await r.json();
+  if(j.error){
+    document.getElementById("bal").textContent = "—";
+    document.getElementById("addr").textContent = "Not initialized. Click Initialize Wallet.";
+    return;
+  }
+  document.getElementById("bal").textContent = fmtX(j.balance_xrp);
+  document.getElementById("addr").textContent = j.address;
+}
+
+function calcShare(selected){
+  const n = 1 + selected.length;
+  return total_xrp / n;
+}
+
+async function startForAlice(){
+  const selected = [];
+  if(document.getElementById("cbBob")?.checked) selected.push("bob");
+  if(document.getElementById("cbChen")?.checked) selected.push("chen");
+  if(selected.length === 0) return alert("Select at least one co-payee.");
+
+  const body = { order_id, total_xrp, return_url, item_label:"Marketplace order", selected_payees:selected };
+
+  const btn = document.getElementById("proceedBtn");
+  btn.disabled = true;
+  document.getElementById("aliceHint").textContent = "Processing… (creating escrow)";
+
+  const res = await fetch("/api/ripplit/start", {
+    method:"POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify(body)
+  });
+
+  const j = await res.json().catch(()=> ({}));
+  if(!res.ok || j.error){
+    document.getElementById("aliceHint").textContent = `Failed: ${(j.detail || j.error || ("HTTP " + res.status))}`;
+    btn.disabled = false;
+    return;
+  }
+
+  document.getElementById("aliceHint").textContent = "Request created. Waiting for co-payees…";
+  await refreshAll();
+  btn.disabled = false;
+}
+
+async function loadInbox(){
+  const r = await fetch(`/api/ripplit/inbox/${user}`);
+  const j = await r.json();
+  const list = j.requests || [];
+  const body = document.getElementById("rightBody");
+
+  if(list.length === 0){
+    body.innerHTML = `<div class="muted">No pending requests.</div>`;
+    return;
+  }
+
+  body.innerHTML = list.map(req => {
+    const p = req.participants[user];
+    return `
+      <div class="req">
+        <div>
+          <div style="font-weight:950">${req.order_id}</div>
+          <div class="muted" style="font-size:12px">Your share: ${fmtX(p.share_xrp)}</div>
+        </div>
+        <button class="btnGood" onclick="pay('${req.request_id}')">Agree & Pay</button>
+      </div>
+    `;
+  }).join("");
+}
+
+async function pay(requestId){
+  await fetch(`/api/ripplit/pay/${requestId}`, {
+    method:"POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({ payer: user })
+  });
+  await refreshAll();
+}
+
+function renderRightPanel(){
+  document.getElementById("subtitle").textContent = `Logged in as ${user.toUpperCase()}`;
+  document.getElementById("userPill").textContent = user.toUpperCase();
+
+  const title = document.getElementById("rightTitle");
+  const tag = document.getElementById("rightTag");
+  const body = document.getElementById("rightBody");
+
+  if(user === "alice"){
+    title.textContent = "Checkout";
+    tag.textContent = order_id ? order_id : "No order";
+
+    if(!order_id){
+      body.innerHTML = `<div class="muted">No redirected order. Go back to marketplace and click “Pay via Ripplit”.</div>`;
+      return;
+    }
+
+    const shareIfBoth = fmtX(calcShare(["bob","chen"]));
+    body.innerHTML = `
+      <div class="muted" style="font-size:13px">Order</div>
+      <div style="font-weight:950">${order_id}</div>
+      <div class="muted" style="font-size:13px; margin-top:10px">Total</div>
+      <div style="font-weight:950">${fmtX(total_xrp)}</div>
+
+      <div class="muted" style="font-size:13px; margin-top:10px">Choose co-payees</div>
+      <div class="contact">
+        <div>
+          <div style="font-weight:950">Bob</div>
+          <div class="muted" style="font-size:12px">did:ripplit:bob</div>
+        </div>
+        <input type="checkbox" id="cbBob" checked />
+      </div>
+      <div class="contact">
+        <div>
+          <div style="font-weight:950">Chen</div>
+          <div class="muted" style="font-size:12px">did:ripplit:chen</div>
+        </div>
+        <input type="checkbox" id="cbChen" checked />
+      </div>
+
+      <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:center; gap:12px">
+        <div>
+          <div class="muted" style="font-size:13px">Your share (if Bob + Chen selected)</div>
+          <div style="font-weight:950">${shareIfBoth}</div>
+        </div>
+        <button class="btnGood" id="proceedBtn" onclick="startForAlice()">Proceed with Payment</button>
+      </div>
+
+      <div class="muted" id="aliceHint" style="font-size:12px; margin-top:10px">Click proceed to create escrows.</div>
+    `;
+  } else {
+    title.textContent = "Requests";
+    tag.textContent = "Inbox";
+    body.innerHTML = `<div class="muted">Loading…</div>`;
+  }
+}
+
+async function refreshAll(){
+  if(!user){
+    window.location.href = "/static/login.html";
+    return;
+  }
+  renderRightPanel();
+  await refreshBalance();
+
+  // NEW: always load history for everyone
+  await loadHistory();
+
+  if(user === "bob" || user === "chen"){
+    await loadInbox();
+  }
+}
+
+
+refreshAll();
+setInterval(() => {
+  loadHistory();
+  if(user === "bob" || user === "chen") loadInbox();
+}, 3000);
+
+</script>
+</body>
+</html>
